@@ -11,6 +11,7 @@ import '../widgets/responsive.dart';
 import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
+import 'quick_invoice_screen.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'insights_screen.dart';
@@ -143,6 +144,17 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
             leading: const Icon(Icons.receipt_long),
             title: const Text('فاتورة جديدة'),
             onTap: () => Navigator.pop(c, DocKind.invoice),
+          ),
+          ListTile(
+            minTileHeight: 56,
+            leading: const Icon(Icons.bolt),
+            title: const Text('فاتورة سريعة (كتابة أو صوت)'),
+            onTap: () async {
+              Navigator.pop(c);
+              await Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const QuickInvoiceScreen()));
+              _load();
+            },
           ),
           ListTile(
             minTileHeight: 56,
