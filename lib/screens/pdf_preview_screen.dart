@@ -36,9 +36,17 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
     );
   }
 
-  String get _fileName =>
-      '${widget.invoice.kind == DocKind.invoice ? 'invoice' : 'inventory'}-${widget.invoice.number}.pdf'
-          .replaceAll(RegExp(r'[^\w.\-]'), '_');
+  /// اسم ملف وصفي: النوع والرقم والتاريخ (أحرف لاتينية آمنة لكل الأنظمة).
+  String get _fileName {
+    final inv = widget.invoice;
+    final d = inv.date;
+    final date =
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final kind = inv.kind == DocKind.invoice ? 'invoice' : 'inventory';
+    return '$kind-${inv.number}-$date.pdf'
+        .replaceAll(RegExp(r'[^\w.\-]'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
+  }
 
   Future<void> _save(Uint8List bytes) async {
     final m = ScaffoldMessenger.of(context);
