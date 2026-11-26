@@ -15,4 +15,7 @@
 GitHub Actions (`.github/workflows/build_apk.yml`) يبني `app-release.apk` ويرفعه كـ Artifact مع كل push.
 محلياً: `flutter pub get && flutter build apk --release`
 
-الخطوط: Amiri و Cairo (SIL Open Font License).
+الخطوط: IBM Plex Sans Arabic و Amiri (SIL Open Font License).
+
+---
+تطوير **CTO: DRS** · Developed by [CTO: DRS](https://cto-drs.com)

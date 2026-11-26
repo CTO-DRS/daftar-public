@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/pdf_service.dart' show PdfTemplate, PdfTemplateX;
 import '../utils/brand_color.dart';
+import 'about_screen.dart';
 import '../main.dart' show themeModeNotifier, themeModeFrom;
 
 import '../services/logo_service.dart';
@@ -186,6 +187,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
         ]),
         const SizedBox(height: 24),
+        const SizedBox(height: 4),
+        Card(
+          child: ListTile(
+            leading: const CircleAvatar(
+                backgroundImage: AssetImage('assets/images/developer.jpg')),
+            title: const Text('عن المطور'),
+            subtitle: const Text('CTO: DRS · cto-drs.com', textDirection: TextDirection.ltr),
+            trailing: const Icon(Icons.chevron_left),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AboutScreen())),
+          ),
+        ),
+        const SizedBox(height: 20),
         const Text('المظهر', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         SegmentedButton<String>(
