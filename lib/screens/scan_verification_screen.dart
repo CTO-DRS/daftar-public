@@ -157,7 +157,7 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
               currency: cur),
         if (_result != null)
           Container(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: SafeArea(
               top: false,
@@ -280,7 +280,9 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
         margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-            color: const Color(0xFFFFF4E5),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF3A2E1A)
+                : const Color(0xFFFFF4E5),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Colors.orange.shade300)),
         child: Column(

@@ -426,7 +426,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                       ),
           ),
           Container(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: Row(children: [
               Expanded(

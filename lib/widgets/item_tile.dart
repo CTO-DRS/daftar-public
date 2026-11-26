@@ -27,7 +27,11 @@ class ItemTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final flagged = item.flagged;
     return Card(
-      color: flagged ? const Color(0xFFFFF4E5) : Colors.white,
+      color: flagged
+          ? (Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF3A2E1A)
+              : const Color(0xFFFFF4E5))
+          : Theme.of(context).cardTheme.color,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
@@ -71,12 +75,12 @@ class ItemTile extends StatelessWidget {
                         fontSize: 15,
                         color: item.description.isEmpty
                             ? Colors.grey
-                            : Colors.black87),
+                            : cs.onSurface),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${formatQty(item.quantity)}${item.unit.trim().isEmpty ? '' : ' ${item.unit.trim()}'} × ${formatMoney(item.unitPrice)}',
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
                   ),
                   if (item.notes.isNotEmpty)
                     Padding(
@@ -85,7 +89,7 @@ class ItemTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              color: Colors.grey.shade600, fontSize: 12)),
+                              color: cs.onSurfaceVariant, fontSize: 12)),
                     ),
                 ],
               ),
@@ -126,13 +130,15 @@ class _Tag extends StatelessWidget {
   final String text;
   const _Tag(this.icon, this.text);
   @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: Colors.grey.shade600),
-          const SizedBox(width: 3),
-          Text(text,
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
-        ],
-      );
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: cs.onSurfaceVariant),
+        const SizedBox(width: 3),
+        Text(text, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+      ],
+    );
+  }
 }

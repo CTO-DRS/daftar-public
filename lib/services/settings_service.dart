@@ -27,6 +27,10 @@ class SettingsService {
       _p.getString('openrouter_model') ?? 'google/gemini-2.5-flash';
   set openrouterModel(String v) => _p.setString('openrouter_model', v.trim());
 
+  /// وضع المظهر: system / light / dark.
+  String get themeMode => _p.getString('theme_mode') ?? 'system';
+  set themeMode(String v) => _p.setString('theme_mode', v);
+
   String get currency => _p.getString('currency') ?? 'ر.س';
   set currency(String v) => _p.setString('currency', v.trim());
 

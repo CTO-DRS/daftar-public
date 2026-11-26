@@ -27,7 +27,9 @@ class TotalsBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Material(
-      color: cs.primary,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF0E4F4B)
+          : cs.primary,
       elevation: 8,
       child: SafeArea(
         top: false,

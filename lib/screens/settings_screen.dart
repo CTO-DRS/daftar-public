@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import '../main.dart' show themeModeNotifier, themeModeFrom;
 
 import '../services/logo_service.dart';
 import '../services/settings_service.dart';
@@ -125,7 +126,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 6),
         Text(
           'عند تعبئة الرقم الضريبي وتفعيل الضريبة يظهر رمز QR بصيغة المرحلة الأولى في ملف PDF. هذا تنسيق فقط وليس اعتماداً من هيئة الزكاة والضريبة والجمارك.',
-          style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        const Text('المظهر', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'system', label: Text('تلقائي')),
+            ButtonSegment(value: 'light', label: Text('فاتح')),
+            ButtonSegment(value: 'dark', label: Text('داكن')),
+          ],
+          selected: {SettingsService.instance.themeMode},
+          onSelectionChanged: (v) {
+            SettingsService.instance.themeMode = v.first;
+            themeModeNotifier.value = themeModeFrom(v.first);
+            setState(() {});
+          },
         ),
         const SizedBox(height: 24),
         const Text('ترقيم الفواتير', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -199,7 +216,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 8),
         Text(
           'المفتاح يُحفظ على جهازك فقط ويُرسل إلى المزود المختار عند المسح. بدون مفتاح أو بدون إنترنت يُستخدم المسح المحلي للنصوص المطبوعة.',
-          style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
         ),
         const SizedBox(height: 24),
         SizedBox(

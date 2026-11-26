@@ -261,7 +261,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                       Text(
                                         '${inv.status.label}  |  ${formatDate(inv.date)}  |  ${localizeDigits('${s.itemCount}')} صنف  |  ${formatQty(s.totalQty)} قطعة',
                                         style: TextStyle(
-                                            color: Colors.grey.shade700,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             fontSize: 13),
                                       ),
                                     ],
