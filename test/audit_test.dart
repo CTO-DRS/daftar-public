@@ -9,14 +9,15 @@ void main() {
   databaseFactory = databaseFactoryFfi;
   test('create, edit and delete are logged', () async {
     final db = AppDatabase.instance;
-    final inv = Invoice(number: 'AUD-1', party: 'أحمد', items: [
+    final num = 'AUD-${DateTime.now().microsecondsSinceEpoch}';
+    final inv = Invoice(number: num, party: 'أحمد', items: [
       InvoiceItem(description: 'كولا', quantity: 2, unitPrice: 5)
     ]);
     final id = await db.saveInvoice(inv);
     inv.items.first.quantity = 4;
     await db.saveInvoice(inv);
     await db.deleteInvoice(id);
-    final log = (await db.auditEntries()).where((e) => e['doc_number'] == 'AUD-1').toList();
+    final log = (await db.auditEntries()).where((e) => e['doc_number'] == num).toList();
     expect(log.map((e) => e['action']).toList().reversed, ['create', 'edit', 'delete']);
     expect((log[1]['detail'] as String).contains('←'), isTrue);
   });
