@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -335,13 +336,20 @@ class _LinkCell extends StatelessWidget {
 Future<void> showLinkSheet(BuildContext context, DevLink l) {
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: const Color(0xFF0D0E2B),
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    showDragHandle: true,
-    builder: (c) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    isScrollControlled: true,
+    builder: (c) => _GlassSheet(
+      child: SafeArea(
+        top: false,
+        child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 10, 24, 20),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(color: const Color(0x66FFFFFF), borderRadius: BorderRadius.circular(2))),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
               width: 34,
@@ -367,7 +375,7 @@ Future<void> showLinkSheet(BuildContext context, DevLink l) {
           Row(children: [
             Expanded(
               child: FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: _violet, minimumSize: const Size(0, 46)),
+                style: FilledButton.styleFrom(backgroundColor: _violet, foregroundColor: Colors.white, minimumSize: const Size(0, 46)),
                 onPressed: () {
                   Navigator.pop(c);
                   _openUrl(context, l.url);
@@ -398,6 +406,35 @@ Future<void> showLinkSheet(BuildContext context, DevLink l) {
           ]),
         ]),
       ),
+      ),
     ),
   );
+}
+
+class _GlassSheet extends StatelessWidget {
+  const _GlassSheet({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    const r = BorderRadius.vertical(top: Radius.circular(28));
+    return ClipRRect(
+      borderRadius: r,
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: r,
+            color: const Color(0xCC0B0C24),
+            border: Border.all(color: const Color(0x408E5BD0)),
+            gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x26FFFFFF), Color(0x0AFFFFFF), Color(0x00FFFFFF)],
+                stops: [0, 0.3, 1]),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
 }
