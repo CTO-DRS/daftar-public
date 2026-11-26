@@ -4,11 +4,18 @@ import 'package:flutter/material.dart';
 import '../services/pdf_service.dart' show PdfTemplate, PdfTemplateX;
 import '../utils/brand_color.dart';
 import 'about_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import '../services/backup_service.dart';
+import '../services/file_saver.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import '../main.dart' show themeModeNotifier, themeModeFrom;
 
 import '../services/logo_service.dart';
 import '../services/settings_service.dart';
 import '../utils/number_utils.dart';
+import '../utils/platform_utils.dart';
 import '../widgets/responsive.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -53,6 +60,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('تم حفظ الإعدادات')));
     Navigator.pop(context);
+  }
+
+  Future<void> _exportBackup() async {
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final json = await BackupService.exportJson();
+      final d = DateTime.now();
+      final name =
+          'daftar-backup-${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}.json';
+      final bytes = Uint8List.fromList(utf8.encode(json));
+      final where = await FileSaver.saveToDownloads(bytes, name, mime: 'application/json');
+      m.showSnackBar(SnackBar(content: Text('تم حفظ النسخة في $where')));
+      if (!isDesktopPlatform) {
+        await SharePlus.instance.share(ShareParams(
+            files: [XFile.fromData(bytes, mimeType: 'application/json', name: name)],
+            fileNameOverrides: [name]));
+      }
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text('تعذر إنشاء النسخة: $e')));
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final f = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['json']);
+      if (f == null) return;
+      final text = utf8.decode(await f.readAsBytes());
+      final sum = BackupService.summarize(BackupService.parse(text));
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('استعادة النسخة؟'),
+          content: Text(
+              'ستُستبدل كل بياناتك الحالية بمحتوى النسخة: ${localizeDigits('${sum.invoices}')} مستنداً و${localizeDigits('${sum.parties}')} عميلاً. لا يمكن التراجع، فصدّر نسخة من بياناتك الحالية أولاً إن لزم.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('استعادة')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      await BackupService.restore(text);
+      m.showSnackBar(const SnackBar(content: Text('تمت الاستعادة. أعد فتح القائمة الرئيسية.')));
+    } on FormatException catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text('تعذرت الاستعادة: $e')));
+    }
   }
 
   @override
@@ -188,6 +245,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ]),
         const SizedBox(height: 24),
         const SizedBox(height: 4),
+        const Text('النسخ الاحتياطي', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text('احفظ نسخة كاملة من فواتيرك وعملائك، واستعدها على أي جهاز.',
+            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+            child: FilledButton.tonalIcon(
+              onPressed: _exportBackup,
+              icon: const Icon(Icons.cloud_upload_outlined),
+              label: const Text('تصدير نسخة'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _restoreBackup,
+              icon: const Icon(Icons.settings_backup_restore),
+              label: const Text('استعادة نسخة'),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 16),
         Card(
           child: ListTile(
             leading: const CircleAvatar(
