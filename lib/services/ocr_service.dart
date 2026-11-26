@@ -175,6 +175,10 @@ class OcrService {
     if (res.statusCode == 401 || res.statusCode == 403) {
       throw OcrException('مفتاح API غير صالح أو غير مصرّح.');
     }
+    if (res.statusCode == 402) {
+      throw OcrException(
+          'رصيد حساب المزود (OpenRouter) منتهي. اشحن الرصيد أو بدّل المزود إلى Gemini بمفتاح مجاني من Google AI Studio في الإعدادات.');
+    }
     if (res.statusCode == 429) {
       throw OcrException('تجاوزت حد الاستخدام عند المزود.');
     }
