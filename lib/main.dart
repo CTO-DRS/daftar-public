@@ -34,14 +34,14 @@ class DaftarApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: scheme,
-        fontFamily: 'Cairo',
+        fontFamily: 'IBMPlexSansArabic',
         scaffoldBackgroundColor: const Color(0xFFF6F8F8),
         appBarTheme: AppBarTheme(
           backgroundColor: scheme.surface,
           surfaceTintColor: Colors.transparent,
           centerTitle: false,
           titleTextStyle: TextStyle(
-            fontFamily: 'Cairo',
+            fontFamily: 'IBMPlexSansArabic',
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: scheme.onSurface,
