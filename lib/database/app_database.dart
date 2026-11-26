@@ -42,7 +42,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 6,
+      version: 7,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -62,6 +62,10 @@ class AppDatabase {
         if (o < 6) {
           await d.execute('ALTER TABLE invoices ADD COLUMN vat_rate REAL NOT NULL DEFAULT 0');
         }
+        if (o < 7) {
+          await d.execute("ALTER TABLE invoices ADD COLUMN note_type TEXT NOT NULL DEFAULT ''");
+          await d.execute("ALTER TABLE invoices ADD COLUMN ref_number TEXT NOT NULL DEFAULT ''");
+        }
       },
       onConfigure: (d) => d.execute('PRAGMA foreign_keys = ON'),
       onCreate: (d, v) async {
@@ -79,6 +83,8 @@ class AppDatabase {
             paid_amount REAL NOT NULL DEFAULT 0,
             currency TEXT NOT NULL DEFAULT '',
             vat_rate REAL NOT NULL DEFAULT 0,
+            note_type TEXT NOT NULL DEFAULT '',
+            ref_number TEXT NOT NULL DEFAULT '',
             item_count INTEGER NOT NULL DEFAULT 0,
             total_qty REAL NOT NULL DEFAULT 0,
             grand_total REAL NOT NULL DEFAULT 0
@@ -172,22 +178,43 @@ class AppDatabase {
     final copy = Invoice(
       kind: src.kind,
       status: InvoiceStatus.draft,
-      number: await nextNumber(src.kind),
+      number: await nextNumber(src.kind, src.isNote ? (src.noteType == 'credit' ? 'CN-' : 'DN-') : null),
       party: src.party,
       notes: src.notes,
       currency: src.currency,
       vatRate: src.vatRate,
+      noteType: src.noteType,
+      refNumber: src.refNumber,
       items: src.items.map((e) => e.copy()..id = null).toList(),
     );
     return saveInvoice(copy);
   }
 
+  /// إشعار دائن/مدين بنقرة واحدة من فاتورة قائمة (مسودة بنفس الأسطر للمراجعة).
+  Future<int> createNote(int id, String type) async {
+    final src = await getInvoice(id);
+    if (src == null) throw StateError('الفاتورة غير موجودة');
+    final credit = type == 'credit';
+    final note = Invoice(
+      kind: DocKind.invoice,
+      status: InvoiceStatus.draft,
+      number: await nextNumber(DocKind.invoice, credit ? 'CN-' : 'DN-'),
+      party: src.party,
+      notes: '${credit ? 'إشعار دائن' : 'إشعار مدين'} عن الفاتورة رقم ${src.number}',
+      currency: src.currency,
+      vatRate: src.vatRate,
+      noteType: type,
+      refNumber: src.number,
+      items: src.items.map((e) => e.copy()..id = null).toList(),
+    );
+    return saveInvoice(note);
+  }
+
   /// الرقم التالي حسب إعدادات الترقيم: بادئة + رقم متسلسل بعدد خانات ثابت.
-  Future<String> nextNumber([DocKind kind = DocKind.invoice]) async {
+  Future<String> nextNumber([DocKind kind = DocKind.invoice, String? prefix]) async {
     final d = await db;
     final st = SettingsService.instance;
-    final prefix =
-        kind == DocKind.inventory ? st.inventoryPrefix : st.numberPrefix;
+    prefix ??= kind == DocKind.inventory ? st.inventoryPrefix : st.numberPrefix;
     final rows = await d.query('invoices', columns: ['number']);
     var max = st.numberStart - 1;
     for (final r in rows) {

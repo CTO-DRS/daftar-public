@@ -113,7 +113,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('حذف'),
-        content: Text('حذف ${s.invoice.kind.label} رقم ${s.invoice.number}؟ لا يمكن التراجع.'),
+        content: Text('حذف ${s.invoice.docLabel} رقم ${s.invoice.number}؟ لا يمكن التراجع.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حذف')),
@@ -193,7 +193,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '${inv.kind.label} ${localizeDigits(inv.number)}'
+                                        '${inv.docLabel} ${localizeDigits(inv.number)}'
                                         '${inv.party.isEmpty ? '' : ' - ${inv.party}'}',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -218,6 +218,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                         style: const TextStyle(
                                             fontWeight: FontWeight.w800)),
                                     if (inv.kind == DocKind.invoice &&
+                                        !inv.isNote &&
                                         s.grandTotal > 0)
                                       Builder(builder: (_) {
                                         final rem = paymentRemaining(
@@ -249,6 +250,14 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                             _delete(s);
                                           } else if (v == 'remind') {
                                             _remind(s);
+                                          } else if (v == 'credit' || v == 'debit') {
+                                            final id = await AppDatabase.instance
+                                                .createNote(inv.id!, v);
+                                            await _load();
+                                            if (!mounted) return;
+                                            final n = await AppDatabase.instance
+                                                .getInvoice(id);
+                                            if (n != null) _open(n);
                                           } else if (v == 'dup') {
                                             await AppDatabase.instance
                                                 .duplicateInvoice(inv.id!);
@@ -257,12 +266,21 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                         },
                                         itemBuilder: (_) => [
                                           if (inv.kind == DocKind.invoice &&
+                                              !inv.isNote &&
                                               paymentRemaining(s.grandTotal,
                                                       inv.paidAmount, inv.status) >
                                                   0.005)
                                             const PopupMenuItem(
                                                 value: 'remind',
                                                 child: Text('تذكير بالسداد (واتساب)')),
+                                          if (inv.kind == DocKind.invoice && !inv.isNote) ...const [
+                                            PopupMenuItem(
+                                                value: 'credit',
+                                                child: Text('إشعار دائن (مرتجع/خصم)')),
+                                            PopupMenuItem(
+                                                value: 'debit',
+                                                child: Text('إشعار مدين (زيادة)')),
+                                          ],
                                           const PopupMenuItem(
                                               value: 'dup', child: Text('نسخ')),
                                           const PopupMenuItem(

@@ -43,7 +43,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
     final d = inv.date;
     final date =
         '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-    final kind = inv.kind == DocKind.invoice ? 'invoice' : 'inventory';
+    final kind = inv.noteType == 'credit' ? 'credit-note' : inv.noteType == 'debit' ? 'debit-note' : inv.kind == DocKind.invoice ? 'invoice' : 'inventory';
     return '$kind-${inv.number}-$date.pdf'
         .replaceAll(RegExp(r'[^\w.\-]'), '_')
         .replaceAll(RegExp(r'_+'), '_');

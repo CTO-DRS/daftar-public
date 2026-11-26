@@ -360,7 +360,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${inv.kind.label} ${_number.text}'),
+          title: Text('${inv.docLabel} ${_number.text}'),
           actions: [
             IconButton(
                 tooltip: 'ترتيب',
@@ -557,7 +557,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   ),
                 ),
               ),
-              if (inv.kind == DocKind.invoice) ...[
+              if (inv.kind == DocKind.invoice && !inv.isNote) ...[
                 const SizedBox(height: 10),
                 Row(children: [
                   Expanded(

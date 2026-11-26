@@ -33,7 +33,7 @@ class PdfService {
     final items = inv.items.where((e) => !e.isEmpty).toList();
     final theme = pw.ThemeData.withFont(base: _regular!, bold: _bold!);
     final doc = pw.Document(
-      title: '${inv.kind.label} ${inv.number}',
+      title: '${inv.docLabel} ${inv.number}',
       author: company.isEmpty ? 'دفتر' : company,
     );
 
@@ -220,7 +220,7 @@ class PdfService {
                   ),
                 ]),
                 pw.Text(
-                  '${inv.kind.label} رقم ${localizeDigits(inv.number)}',
+                  '${inv.docLabel} رقم ${localizeDigits(inv.number)}',
                   style: pw.TextStyle(
                       fontSize: 18, fontWeight: pw.FontWeight.bold),
                 ),
@@ -238,6 +238,9 @@ class PdfService {
                     '${inv.kind == DocKind.invoice && inv.dueDate != null ? '   |   الاستحقاق: ${formatDate(inv.dueDate!)}' : ''}'
                     '   |   الحالة: ${inv.status.label}',
                     style: const pw.TextStyle(fontSize: 12)),
+                if (inv.isNote && inv.refNumber.isNotEmpty)
+                  pw.Text('عن الفاتورة رقم: ${localizeDigits(inv.refNumber)}',
+                      style: const pw.TextStyle(fontSize: 12)),
               ],
             ),
             if (showVat && sellerVat.trim().isNotEmpty) ...[

@@ -41,6 +41,8 @@ class Invoice {
   DateTime? dueDate; // تاريخ الاستحقاق
   double paidAmount; // المبلغ المدفوع
   double vatRate; // نسبة ضريبة القيمة المضافة % (0 = بدون)
+  String noteType; // '' فاتورة عادية، 'credit' إشعار دائن، 'debit' إشعار مدين
+  String refNumber; // رقم الفاتورة الأصلية للإشعار
   String currency; // عملة هذا المستند (فارغ = عملة الإعدادات)
   List<InvoiceItem> items;
 
@@ -57,6 +59,8 @@ class Invoice {
     this.paidAmount = 0,
     this.currency = '',
     this.vatRate = 0,
+    this.noteType = '',
+    this.refNumber = '',
     List<InvoiceItem>? items,
   })  : date = date ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
@@ -77,11 +81,20 @@ class Invoice {
 
   double get grandTotal => subtotal + vatAmount;
 
+  bool get isNote => noteType.isNotEmpty;
+
+  /// اسم المستند للعرض: فاتورة / جرد / إشعار دائن / إشعار مدين.
+  String get docLabel => noteType == 'credit'
+      ? 'إشعار دائن'
+      : noteType == 'debit'
+          ? 'إشعار مدين'
+          : kind.label;
+
   String currencyOr(String fallback) =>
       currency.trim().isEmpty ? fallback : currency.trim();
 
   /// المتبقي بعد الدفعات.
-  double get remaining => paymentRemaining(grandTotal, paidAmount, status);
+  double get remaining => isNote ? 0 : paymentRemaining(grandTotal, paidAmount, status);
 
   bool get isFullyPaid => remaining <= 0.005;
 
@@ -101,6 +114,8 @@ class Invoice {
         'paid_amount': paidAmount,
         'currency': currency,
         'vat_rate': vatRate,
+        'note_type': noteType,
+        'ref_number': refNumber,
         'item_count': itemCount,
         'total_qty': totalQuantity,
         'grand_total': grandTotal,
@@ -123,6 +138,8 @@ class Invoice {
         paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
         currency: (m['currency'] as String?) ?? '',
         vatRate: (m['vat_rate'] as num?)?.toDouble() ?? 0,
+        noteType: (m['note_type'] as String?) ?? '',
+        refNumber: (m['ref_number'] as String?) ?? '',
         items: items,
       );
 }
