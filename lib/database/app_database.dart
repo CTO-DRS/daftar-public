@@ -238,6 +238,16 @@ extension PartyQueries on AppDatabase {
     return out;
   }
 
+  /// الطرف المحفوظ بهذا الاسم (إن وُجد) لعرض هاتفه وعنوانه في الـ PDF.
+  Future<Party?> partyByName(String name) async {
+    final n = name.trim();
+    if (n.isEmpty) return null;
+    final d = await db;
+    final rows = await d.query('parties',
+        where: 'name = ? COLLATE NOCASE', whereArgs: [n], limit: 1);
+    return rows.isEmpty ? null : Party.fromMap(rows.first);
+  }
+
   Future<void> saveParty(Party p) async {
     final d = await db;
     final m = p.toMap()..remove('id');

@@ -24,6 +24,8 @@ class PdfService {
     String currency = 'ر.س',
     String company = '',
     Uint8List? logo,
+    String partyPhone = '',
+    String partyAddress = '',
   }) async {
     await _loadFonts();
     final theme = pw.ThemeData.withFont(base: _regular!, bold: _bold!);
@@ -134,6 +136,15 @@ class PdfService {
                     style: const pw.TextStyle(fontSize: 12)),
               ],
             ),
+            if (partyPhone.isNotEmpty || partyAddress.isNotEmpty) ...[
+              pw.SizedBox(height: 2),
+              pw.Text(
+                  [
+                    if (partyPhone.isNotEmpty) 'هاتف: ${localizeDigits(partyPhone)}',
+                    if (partyAddress.isNotEmpty) 'العنوان: $partyAddress',
+                  ].join('   |   '),
+                  style: const pw.TextStyle(fontSize: 11)),
+            ],
             if (inv.notes.isNotEmpty) ...[
               pw.SizedBox(height: 2),
               pw.Text('ملاحظات: ${inv.notes}',

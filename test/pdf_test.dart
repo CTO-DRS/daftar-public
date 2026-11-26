@@ -32,7 +32,7 @@ void main() {
     img.fill(logoImg, color: img.ColorRgb8(15, 118, 110));
     final logo = LogoService.normalize(Uint8List.fromList(img.encodePng(logoImg)));
     expect(img.decodePng(logo)!.width, 400);
-    final bytes = await PdfService.build(inv, company: 'شركة دفتر', logo: logo);
+    final bytes = await PdfService.build(inv, company: 'شركة دفتر', logo: logo, partyPhone: '0551234567', partyAddress: 'المدينة المنورة');
     expect(bytes.length, greaterThan(5000));
     expect(String.fromCharCodes(bytes.take(4)), '%PDF');
     final out = Platform.environment['PDF_OUT'];

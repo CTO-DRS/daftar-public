@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../database/app_database.dart';
 import '../models/invoice.dart';
 import '../services/file_saver.dart';
 import '../services/pdf_service.dart';
@@ -23,12 +24,17 @@ class PdfPreviewScreen extends StatefulWidget {
 class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
   late final Future<Uint8List> _bytes = _build();
 
-  Future<Uint8List> _build() async => PdfService.build(
+  Future<Uint8List> _build() async {
+    final party = await AppDatabase.instance.partyByName(widget.invoice.party);
+    return PdfService.build(
         widget.invoice,
+        partyPhone: party?.phone ?? '',
+        partyAddress: party?.address ?? '',
         currency: SettingsService.instance.currency,
         company: SettingsService.instance.companyName,
         logo: await LogoService.load(),
-      );
+    );
+  }
 
   String get _fileName =>
       '${widget.invoice.kind == DocKind.invoice ? 'invoice' : 'inventory'}-${widget.invoice.number}.pdf'
