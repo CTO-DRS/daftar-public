@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import '../services/logo_service.dart';
 import '../services/settings_service.dart';
 import '../utils/number_utils.dart';
 import '../widgets/responsive.dart';
@@ -53,6 +56,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
             controller: _company,
             decoration: const InputDecoration(
                 labelText: 'اسم المنشأة (يظهر في ترويسة PDF)')),
+        const SizedBox(height: 12),
+        Row(children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(8)),
+            child: s.logoPath.isEmpty
+                ? const Icon(Icons.image_outlined)
+                : Image.file(File(s.logoPath), fit: BoxFit.contain,
+                    errorBuilder: (c, e, st) => const Icon(Icons.broken_image)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              label: Text(s.logoPath.isEmpty ? 'إضافة شعار للـ PDF' : 'تغيير الشعار'),
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                try {
+                  if (await LogoService.pickAndSave()) setState(() {});
+                } catch (e) {
+                  messenger.showSnackBar(
+                      SnackBar(content: Text('تعذر استخدام الصورة: $e')));
+                }
+              },
+            ),
+          ),
+          if (s.logoPath.isNotEmpty)
+            IconButton(
+              tooltip: 'حذف الشعار',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () async {
+                await LogoService.remove();
+                setState(() {});
+              },
+            ),
+        ]),
         const SizedBox(height: 12),
         TextField(
             controller: _currency,

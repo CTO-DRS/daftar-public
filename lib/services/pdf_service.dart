@@ -23,6 +23,7 @@ class PdfService {
     Invoice inv, {
     String currency = 'ر.س',
     String company = '',
+    Uint8List? logo,
   }) async {
     await _loadFonts();
     final theme = pw.ThemeData.withFont(base: _regular!, bold: _bold!);
@@ -31,6 +32,7 @@ class PdfService {
       author: company.isEmpty ? 'دفتر' : company,
     );
 
+    final logoImage = logo == null ? null : pw.MemoryImage(logo);
     const headerColor = PdfColor.fromInt(0xFF0F766E);
     const zebra = PdfColor.fromInt(0xFFF0F5F5);
 
@@ -96,13 +98,21 @@ class PdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(
-                  company.isEmpty ? 'دفتر' : company,
-                  style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                      color: headerColor),
-                ),
+                pw.Row(children: [
+                  if (logoImage != null)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(left: 10),
+                      child: pw.Image(logoImage,
+                          height: 44, fit: pw.BoxFit.contain),
+                    ),
+                  pw.Text(
+                    company.isEmpty ? 'دفتر' : company,
+                    style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: headerColor),
+                  ),
+                ]),
                 pw.Text(
                   '${inv.kind.label} رقم ${localizeDigits(inv.number)}',
                   style: pw.TextStyle(

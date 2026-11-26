@@ -33,6 +33,9 @@ class SettingsService {
   String get companyName => _p.getString('company_name') ?? '';
   set companyName(String v) => _p.setString('company_name', v.trim());
 
+  String get logoPath => _p.getString('logo_path') ?? '';
+  set logoPath(String v) => _p.setString('logo_path', v);
+
   /// ترقيم الفواتير: بادئة (مثل INV-)، أول رقم، عدد الخانات.
   String get numberPrefix => _p.getString('num_prefix') ?? '';
   set numberPrefix(String v) => _p.setString('num_prefix', v.trim());

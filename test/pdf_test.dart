@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
+import 'package:daftar/services/logo_service.dart';
 import 'dart:io';
 
 import 'package:daftar/models/invoice.dart';
@@ -25,7 +28,11 @@ void main() {
         ),
       ),
     );
-    final bytes = await PdfService.build(inv, company: 'شركة دفتر');
+    final logoImg = img.Image(width: 600, height: 300);
+    img.fill(logoImg, color: img.ColorRgb8(15, 118, 110));
+    final logo = LogoService.normalize(Uint8List.fromList(img.encodePng(logoImg)));
+    expect(img.decodePng(logo)!.width, 400);
+    final bytes = await PdfService.build(inv, company: 'شركة دفتر', logo: logo);
     expect(bytes.length, greaterThan(5000));
     expect(String.fromCharCodes(bytes.take(4)), '%PDF');
     final out = Platform.environment['PDF_OUT'];
