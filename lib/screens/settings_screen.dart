@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/settings_service.dart';
 import '../utils/number_utils.dart';
+import '../widgets/responsive.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -39,7 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('الإعدادات')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      body: ContentWidth(maxWidth: 640, child: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('عام', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         TextField(
@@ -99,7 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SizedBox(
             height: 52,
             child: FilledButton(onPressed: _save, child: const Text('حفظ'))),
-      ]),
+      ])),
     );
   }
 }

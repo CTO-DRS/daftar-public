@@ -5,12 +5,15 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/ocr_service.dart';
+import '../utils/platform_utils.dart';
 import 'scan_verification_screen.dart';
 
 /// مسار المسح: التقاط/اختيار صورة، قص وتدوير، ثم شاشة المراجعة.
 /// يعيد true إذا اعتمد المستخدم الفاتورة وحُفظت.
 Future<bool> startScanFlow(BuildContext context) async {
-  final source = await showModalBottomSheet<ImageSource>(
+  final source = !isMobilePlatform
+      ? ImageSource.gallery
+      : await showModalBottomSheet<ImageSource>(
     context: context,
     showDragHandle: true,
     builder: (c) => SafeArea(
@@ -39,7 +42,9 @@ Future<bool> startScanFlow(BuildContext context) async {
         .pickImage(source: source, maxWidth: 3000, maxHeight: 3000, imageQuality: 92);
     if (picked == null) return false;
 
-    final cropped = await ImageCropper().cropImage(
+    final cropped = !isMobilePlatform
+        ? CroppedFile(picked.path)
+        : await ImageCropper().cropImage(
       sourcePath: picked.path,
       compressFormat: ImageCompressFormat.jpg,
       compressQuality: 92,

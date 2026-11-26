@@ -1,5 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
 import '../models/invoice_item.dart';
@@ -13,10 +15,22 @@ class AppDatabase {
 
   Future<Database> get db async => _db ??= await _open();
 
+  static bool get isDesktop =>
+      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
   Future<Database> _open() async {
-    final path = p.join(await getDatabasesPath(), 'daftar.db');
-    return openDatabase(
+    // على سطح المكتب نستخدم SQLite عبر FFI، وعلى أندرويد sqflite العادي.
+    final DatabaseFactory factory;
+    if (isDesktop) {
+      sqfliteFfiInit();
+      factory = databaseFactoryFfi;
+    } else {
+      factory = databaseFactory;
+    }
+    final path = p.join(await factory.getDatabasesPath(), 'daftar.db');
+    return factory.openDatabase(
       path,
+      options: OpenDatabaseOptions(
       version: 2,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
@@ -53,6 +67,7 @@ class AppDatabase {
           )''');
         await d.execute('CREATE INDEX idx_items_invoice ON items(invoice_id, position)');
       },
+      ),
     );
   }
 

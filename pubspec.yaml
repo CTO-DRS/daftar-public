@@ -49,6 +49,8 @@ dependencies:
   google_mlkit_text_recognition: ^1.0.3
   shared_preferences: ^2.5.6
   image: ^4.13.1
+  sqflite_common_ffi: ^2.4.7
+  sqlite3_flutter_libs: ^0.6.0+eol
 
 dev_dependencies:
   flutter_test:

@@ -9,6 +9,7 @@ import '../utils/number_utils.dart';
 import '../utils/sort_utils.dart';
 import '../widgets/item_edit_sheet.dart';
 import '../widgets/item_tile.dart';
+import '../widgets/responsive.dart';
 import '../widgets/totals_bar.dart';
 import 'pdf_preview_screen.dart';
 
@@ -331,7 +332,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 onPressed: () => _save()),
           ],
         ),
-        body: Column(children: [
+        body: ContentWidth(
+            child: Column(children: [
           _header(inv),
           _toolbar(),
           Expanded(
@@ -405,7 +407,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             grandTotal: inv.grandTotal,
             currency: _cur,
           ),
-        ]),
+        ])),
       ),
     );
   }

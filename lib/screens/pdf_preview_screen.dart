@@ -7,6 +7,8 @@ import '../models/invoice.dart';
 import '../services/file_saver.dart';
 import '../services/pdf_service.dart';
 import '../services/settings_service.dart';
+import '../utils/platform_utils.dart';
+import '../widgets/responsive.dart';
 
 /// معاينة PDF داخل التطبيق + مشاركة (واتساب وغيره) + حفظ في الهاتف + طباعة.
 class PdfPreviewScreen extends StatefulWidget {
@@ -52,7 +54,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final bytes = snap.data!;
-          return Column(children: [
+          return ContentWidth(maxWidth: 1000, child: Column(children: [
             Expanded(
               child: PdfPreview(
                 build: (_) async => bytes,
@@ -74,10 +76,11 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                     child: SizedBox(
                       height: 52,
                       child: FilledButton.icon(
-                        onPressed: () =>
-                            Printing.sharePdf(bytes: bytes, filename: _fileName),
-                        icon: const Icon(Icons.share),
-                        label: const Text('مشاركة (واتساب)'),
+                        onPressed: () => isDesktopPlatform
+                            ? Printing.layoutPdf(onLayout: (_) async => bytes, name: _fileName)
+                            : Printing.sharePdf(bytes: bytes, filename: _fileName),
+                        icon: Icon(isDesktopPlatform ? Icons.print : Icons.share),
+                        label: Text(isDesktopPlatform ? 'طباعة' : 'مشاركة (واتساب)'),
                       ),
                     ),
                   ),
@@ -95,7 +98,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                 ]),
               ),
             ),
-          ]);
+          ]));
         },
       ),
     );

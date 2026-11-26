@@ -12,6 +12,7 @@ import '../models/ocr_result.dart';
 import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
 import '../utils/ocr_parsing.dart';
+import '../utils/platform_utils.dart';
 import 'settings_service.dart';
 
 const kOcrPrompt = '''
@@ -204,6 +205,11 @@ class OcrService {
 
   /// المسح المحلي بـ ML Kit (يعمل بدون إنترنت، للنصوص المطبوعة اللاتينية والأرقام).
   Future<OcrResult> scanOffline(File image) async {
+    if (!isMobilePlatform) {
+      return OcrResult(source: OcrSource.offline, items: [], warnings: [
+        'المسح المحلي غير متاح على سطح المكتب. أدخل مفتاح API من الإعدادات.'
+      ]);
+    }
     final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       final rt = await recognizer.processImage(InputImage.fromFile(image));

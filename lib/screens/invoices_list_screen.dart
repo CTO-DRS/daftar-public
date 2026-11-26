@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../database/app_database.dart';
 import '../models/invoice.dart';
 import '../services/settings_service.dart';
+import '../utils/platform_utils.dart';
+import '../widgets/responsive.dart';
 import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
@@ -114,7 +116,8 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
           ),
         ],
       ),
-      body: Column(children: [
+      body: ContentWidth(
+          child: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: TextField(
@@ -212,7 +215,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                       },
                     ),
         ),
-      ]),
+      ])),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
@@ -222,7 +225,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
             heroTag: 'scan',
             onPressed: _scan,
             icon: const Icon(Icons.document_scanner_outlined),
-            label: const Text('مسح بالكاميرا'),
+            label: Text(isMobilePlatform ? 'مسح بالكاميرا' : 'مسح صورة فاتورة'),
           ),
           const SizedBox(height: 12),
           FloatingActionButton.extended(
