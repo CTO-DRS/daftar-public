@@ -15,6 +15,9 @@ import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'recurring_screen.dart';
 import '../utils/recurrence.dart';
+import '../utils/dashboard.dart';
+import '../widgets/dashboard_header.dart';
+import '../widgets/empty_state.dart';
 import 'settings_screen.dart';
 
 /// الشاشة الرئيسية: قائمة الفواتير وجداول الجرد.
@@ -29,6 +32,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
   final _search = TextEditingController();
   List<InvoiceSummary> _items = [];
   bool _loading = true;
+  DashboardStats? _stats;
 
   Future<void> _remind(InvoiceSummary s) async {
     final inv = s.invoice;
@@ -100,8 +104,14 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
 
   Future<void> _load() async {
     final list = await AppDatabase.instance.listInvoices(query: _search.text);
+    final all = _search.text.trim().isEmpty
+        ? list
+        : await AppDatabase.instance.listInvoices();
+    final stats = computeDashboard(all, DateTime.now(),
+        currency: SettingsService.instance.currency);
     if (!mounted) return;
     setState(() {
+      _stats = stats;
       _items = list;
       _loading = false;
     });
@@ -192,6 +202,9 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       ),
       body: ContentWidth(
           child: Column(children: [
+        if (_stats != null && _stats!.hasData)
+          DashboardHeader(
+              stats: _stats!, currency: SettingsService.instance.currency),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: TextField(
@@ -374,14 +387,9 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
 class _Empty extends StatelessWidget {
   const _Empty();
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.receipt_long, size: 72, color: Colors.grey.shade400),
-          const SizedBox(height: 12),
-          const Text('لا توجد فواتير بعد', style: TextStyle(fontSize: 18)),
-          const SizedBox(height: 4),
-          Text('اضغط "جديد" أو امسح فاتورة ورقية بالكاميرا',
-              style: TextStyle(color: Colors.grey.shade600)),
-        ]),
+  Widget build(BuildContext context) => const EmptyState(
+        title: 'ابدأ بأول فاتورة',
+        hint: 'اضغط «جديد» لإنشاء فاتورة أو جدول جرد،\nأو صوّر فاتورة ورقية وسنكتبها لك.',
+        badge: Icons.add,
       );
 }

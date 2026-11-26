@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/empty_state.dart';
 
 import '../database/app_database.dart';
 import '../models/invoice.dart';
@@ -382,9 +383,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           _toolbar(),
           Expanded(
             child: inv.items.isEmpty
-                ? Center(
-                    child: Text('لا توجد أصناف. اضغط "إضافة سطر".',
-                        style: TextStyle(color: Colors.grey.shade600)))
+                ? const EmptyState(
+                    title: 'لا توجد أصناف بعد',
+                    hint: 'اضغط «إضافة سطر» لإدخال أول صنف.',
+                    badge: Icons.playlist_add)
                 : visible.isEmpty
                     ? const Center(child: Text('لا نتائج مطابقة'))
                     : ListView.builder(

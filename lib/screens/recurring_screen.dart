@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/empty_state.dart';
 
 import '../database/app_database.dart';
 import '../utils/date_utils.dart';
@@ -32,13 +33,10 @@ class _RecurringScreenState extends State<RecurringScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('الفواتير الدورية')),
       body: _items.isEmpty
-          ? const Center(
-              child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                  'لا توجد فواتير دورية. من قائمة أي فاتورة اختر «جعلها دورية».',
-                  textAlign: TextAlign.center),
-            ))
+          ? const EmptyState(
+              title: 'لا توجد فواتير دورية',
+              hint: 'من قائمة أي فاتورة اختر «جعلها دورية»\nوتُنشأ مسودتها تلقائياً في موعدها.',
+              badge: Icons.autorenew)
           : ListView.separated(
               itemCount: _items.length,
               separatorBuilder: (_, _) => const Divider(height: 1),

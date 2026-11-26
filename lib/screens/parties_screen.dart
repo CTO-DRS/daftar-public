@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/empty_state.dart';
 
 import '../database/app_database.dart';
 import '../models/party.dart';
@@ -109,7 +110,10 @@ class _PartiesScreenState extends State<PartiesScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _items.isEmpty
-                    ? const Center(child: Text('لا يوجد عملاء. اضغط "إضافة".'))
+                    ? const EmptyState(
+                        title: 'لا يوجد عملاء أو موردون بعد',
+                        hint: 'أضف عميلاً ليظهر اسمه ورقمه في الفواتير\nوتصلك تذكيرات السداد بضغطة.',
+                        badge: Icons.person_add_alt_1)
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                         itemCount: _items.length,
