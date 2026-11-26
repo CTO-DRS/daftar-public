@@ -41,7 +41,8 @@ class OcrResult {
 
 class OcrException implements Exception {
   final String message;
-  OcrException(this.message);
+  final int? status;
+  OcrException(this.message, {this.status});
   @override
   String toString() => message;
 }

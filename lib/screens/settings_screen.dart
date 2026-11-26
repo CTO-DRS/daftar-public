@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:flutter/services.dart' show Clipboard;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flutter/material.dart';
 import '../services/pdf_service.dart' show PdfTemplate, PdfTemplateX;
@@ -47,7 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     s.currency = _currency.text.trim().isEmpty ? 'ر.س' : _currency.text;
     s.geminiModel = _gModel.text.isEmpty ? 'gemini-2.5-flash' : _gModel.text;
     s.openrouterModel =
-        _oModel.text.isEmpty ? 'google/gemini-2.5-flash' : _oModel.text;
+        _oModel.text.isEmpty ? SettingsService.freeVisionModels.first : _oModel.text;
     s.numberPrefix = _prefix.text;
     s.inventoryPrefix = _prefixInv.text;
     s.sellerVat = normalizeDigits(_vatNo.text);
@@ -359,6 +361,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: Text(_provider == OcrProvider.gemini
+                ? 'احصل على مفتاح Gemini المجاني'
+                : 'احصل على مفتاح OpenRouter'),
+            onPressed: () => launchUrl(
+                Uri.parse(_provider == OcrProvider.gemini
+                    ? 'https://aistudio.google.com/apikey'
+                    : 'https://openrouter.ai/keys'),
+                mode: LaunchMode.externalApplication),
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.content_paste, size: 18),
+            label: const Text('الصق المفتاح'),
+            onPressed: () async {
+              final d = await Clipboard.getData('text/plain');
+              final t = (d?.text ?? '').trim();
+              if (t.isNotEmpty) setState(() => _key.text = t);
+            },
+          ),
+        ]),
         const SizedBox(height: 12),
         TextField(
             controller: _provider == OcrProvider.gemini ? _gModel : _oModel,

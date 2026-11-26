@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -135,54 +136,80 @@ class OcrService {
       text = (j['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '')
           .toString();
     } else {
-      final model = _settings.openrouterModel;
-      final res = await _client
-          .post(
-            Uri.https('openrouter.ai', '/api/v1/chat/completions'),
-            headers: {
-              'content-type': 'application/json',
-              'authorization': 'Bearer $key',
-            },
-            body: jsonEncode({
-              'model': model,
-              'temperature': 0,
-              'messages': [
-                {
-                  'role': 'user',
-                  'content': [
-                    {'type': 'text', 'text': kOcrPrompt},
-                    {
-                      'type': 'image_url',
-                      'image_url': {'url': 'data:image/jpeg;base64,$b64'}
-                    },
-                  ],
-                }
-              ],
-            }),
-          )
-          .timeout(const Duration(seconds: 90));
-      _checkStatus(res);
-      final j = jsonDecode(utf8.decode(res.bodyBytes));
-      text = (j['choices']?[0]?['message']?['content'] ?? '').toString();
+      final chain = <String>{
+        _settings.openrouterModel,
+        ...SettingsService.freeVisionModels,
+      }.toList();
+      OcrException? last;
+      text = '';
+      for (final model in chain) {
+        try {
+          text = await _openrouterCall(model, b64, key);
+          if (text.trim().isNotEmpty) break;
+          last = OcrException('رد فارغ من الخدمة.');
+        } on OcrException catch (e) {
+          last = e;
+          final st = e.status;
+          // مفتاح خاطئ: لا فائدة من تجربة نموذج آخر.
+          if (st == 401 || st == 403) rethrow;
+        } on FormatException {
+          last = OcrException('رد غير مفهوم.');
+        } on TimeoutException {
+          last = OcrException('انتهت مهلة الخدمة.');
+        }
+      }
+      if (text.trim().isEmpty && last != null) throw last;
     }
     if (text.trim().isEmpty) throw OcrException('رد فارغ من الخدمة.');
     return parseOnlineResponse(text,
         prov == OcrProvider.gemini ? OcrSource.gemini : OcrSource.openrouter);
   }
 
+  Future<String> _openrouterCall(String model, String b64, String key) async {
+    final res = await _client
+        .post(
+          Uri.https('openrouter.ai', '/api/v1/chat/completions'),
+          headers: {
+            'content-type': 'application/json',
+            'authorization': 'Bearer $key',
+          },
+          body: jsonEncode({
+            'model': model,
+            'temperature': 0,
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {'type': 'text', 'text': kOcrPrompt},
+                  {
+                    'type': 'image_url',
+                    'image_url': {'url': 'data:image/jpeg;base64,$b64'}
+                  },
+                ],
+              }
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 90));
+    _checkStatus(res);
+    final j = jsonDecode(utf8.decode(res.bodyBytes));
+    return (j['choices']?[0]?['message']?['content'] ?? '').toString();
+  }
+
   void _checkStatus(http.Response res) {
     if (res.statusCode == 200) return;
     if (res.statusCode == 401 || res.statusCode == 403) {
-      throw OcrException('مفتاح API غير صالح أو غير مصرّح.');
+      throw OcrException('مفتاح API غير صالح أو غير مصرّح.', status: res.statusCode);
     }
     if (res.statusCode == 402) {
       throw OcrException(
-          'رصيد حساب المزود (OpenRouter) منتهي. اشحن الرصيد أو بدّل المزود إلى Gemini بمفتاح مجاني من Google AI Studio في الإعدادات.');
+          'رصيد حساب المزود (OpenRouter) منتهي. اشحن الرصيد أو بدّل المزود إلى Gemini بمفتاح مجاني من Google AI Studio في الإعدادات.', status: 402);
     }
     if (res.statusCode == 429) {
-      throw OcrException('تجاوزت حد الاستخدام عند المزود.');
+      throw OcrException('تجاوزت حد الاستخدام عند المزود.', status: 429);
     }
-    throw OcrException('الخدمة أعادت خطأ ${res.statusCode}.');
+    throw OcrException('الخدمة أعادت خطأ ${res.statusCode}.',
+        status: res.statusCode);
   }
 
   /// تحويل نص رد النموذج إلى نتيجة (للاختبار أيضاً).

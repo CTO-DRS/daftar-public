@@ -23,8 +23,22 @@ class SettingsService {
   String get geminiModel => _p.getString('gemini_model') ?? 'gemini-2.5-flash';
   set geminiModel(String v) => _p.setString('gemini_model', v.trim());
 
-  String get openrouterModel =>
-      _p.getString('openrouter_model') ?? 'google/gemini-2.5-flash';
+  /// النماذج المجانية تُجرَّب تلقائياً بالترتيب (رصيد صفر لا يوقف المسح).
+  static const freeVisionModels = <String>[
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'nvidia/nemotron-3.5-super-vl:free',
+    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  ];
+
+  String get openrouterModel {
+    final v = _p.getString('openrouter_model');
+    // القيمة القديمة الافتراضية (مدفوعة) تُعتبر غير مضبوطة.
+    if (v == null || v.isEmpty || v == 'google/gemini-2.5-flash') {
+      return freeVisionModels.first;
+    }
+    return v;
+  }
   set openrouterModel(String v) => _p.setString('openrouter_model', v.trim());
 
   /// وضع المظهر: system / light / dark.
