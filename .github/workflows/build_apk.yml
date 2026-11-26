@@ -32,8 +32,19 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Decode release keystore
+        env:
+          KS_B64: ${{ secrets.DAFTAR_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/daftar-release.p12"
+            echo "DAFTAR_KEYSTORE_PATH=$RUNNER_TEMP/daftar-release.p12" >> "$GITHUB_ENV"
+          fi
+
       - name: Build release APK
         timeout-minutes: 25
+        env:
+          DAFTAR_KEYSTORE_PASSWORD: ${{ secrets.DAFTAR_KEYSTORE_PASSWORD }}
         run: flutter build apk --release -v
 
       - name: Upload APK artifact

@@ -34,12 +34,24 @@ android {
         versionName = flutter.versionName
     }
 
+    val ksPath = System.getenv("DAFTAR_KEYSTORE_PATH")
+    val hasKs = ksPath != null && file(ksPath).exists()
+    signingConfigs {
+        if (hasKs) {
+            create("daftarRelease") {
+                storeFile = file(ksPath!!)
+                storePassword = System.getenv("DAFTAR_KEYSTORE_PASSWORD")
+                keyAlias = "daftar"
+                keyPassword = System.getenv("DAFTAR_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Stable release key from CI secrets; falls back to debug for local runs.
+            signingConfig = if (hasKs) signingConfigs.getByName("daftarRelease") else signingConfigs.getByName("debug")
         }
     }
 }
