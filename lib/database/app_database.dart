@@ -42,7 +42,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 5,
+      version: 6,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -58,6 +58,9 @@ class AppDatabase {
         }
         if (o < 5) {
           await d.execute("ALTER TABLE invoices ADD COLUMN currency TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 6) {
+          await d.execute('ALTER TABLE invoices ADD COLUMN vat_rate REAL NOT NULL DEFAULT 0');
         }
       },
       onConfigure: (d) => d.execute('PRAGMA foreign_keys = ON'),
@@ -75,6 +78,7 @@ class AppDatabase {
             due_date INTEGER,
             paid_amount REAL NOT NULL DEFAULT 0,
             currency TEXT NOT NULL DEFAULT '',
+            vat_rate REAL NOT NULL DEFAULT 0,
             item_count INTEGER NOT NULL DEFAULT 0,
             total_qty REAL NOT NULL DEFAULT 0,
             grand_total REAL NOT NULL DEFAULT 0
@@ -172,6 +176,7 @@ class AppDatabase {
       party: src.party,
       notes: src.notes,
       currency: src.currency,
+      vatRate: src.vatRate,
       items: src.items.map((e) => e.copy()..id = null).toList(),
     );
     return saveInvoice(copy);

@@ -177,6 +177,11 @@ class EditorController extends ChangeNotifier {
     markDirty();
   }
 
+  void setVatRate(double r) {
+    inv.vatRate = r < 0 ? 0 : (r > 100 ? 100 : r);
+    markDirty();
+  }
+
   void setStatus(InvoiceStatus st) {
     final wasPaid = inv.status == InvoiceStatus.paid;
     inv.status = st;

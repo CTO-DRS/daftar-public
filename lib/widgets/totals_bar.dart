@@ -8,6 +8,9 @@ class TotalsBar extends StatelessWidget {
   final double totalQty;
   final double grandTotal;
   final String currency;
+  final double subtotal;
+  final double vatAmount;
+  final double vatRate;
 
   const TotalsBar({
     super.key,
@@ -15,6 +18,9 @@ class TotalsBar extends StatelessWidget {
     required this.totalQty,
     required this.grandTotal,
     required this.currency,
+    this.subtotal = 0,
+    this.vatAmount = 0,
+    this.vatRate = 0,
   });
 
   @override
@@ -27,7 +33,16 @@ class TotalsBar extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(children: [
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (vatAmount > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'قبل الضريبة ${formatMoney(subtotal)}  +  ضريبة ${formatQty(vatRate)}% ${formatMoney(vatAmount)}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            Row(children: [
             _Stat(label: 'الأصناف', value: localizeDigits('$itemCount')),
             _divider(),
             _Stat(label: 'القطع', value: formatQty(totalQty)),
@@ -39,6 +54,7 @@ class TotalsBar extends StatelessWidget {
                   value: formatMoney(grandTotal),
                   big: true),
             ),
+          ]),
           ]),
         ),
       ),

@@ -40,6 +40,7 @@ class Invoice {
   DateTime updatedAt;
   DateTime? dueDate; // تاريخ الاستحقاق
   double paidAmount; // المبلغ المدفوع
+  double vatRate; // نسبة ضريبة القيمة المضافة % (0 = بدون)
   String currency; // عملة هذا المستند (فارغ = عملة الإعدادات)
   List<InvoiceItem> items;
 
@@ -55,6 +56,7 @@ class Invoice {
     this.dueDate,
     this.paidAmount = 0,
     this.currency = '',
+    this.vatRate = 0,
     List<InvoiceItem>? items,
   })  : date = date ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
@@ -67,7 +69,13 @@ class Invoice {
   double get totalQuantity => items.fold(0.0, (s, i) => s + i.quantity);
 
   /// المبلغ الإجمالي النهائي.
-  double get grandTotal => items.fold(0.0, (s, i) => s + i.total);
+  double get subtotal => items.fold(0.0, (s, i) => s + i.total);
+
+  /// ضريبة القيمة المضافة مقرّبة إلى خانتين.
+  double get vatAmount =>
+      vatRate <= 0 ? 0 : (subtotal * vatRate / 100 * 100).roundToDouble() / 100;
+
+  double get grandTotal => subtotal + vatAmount;
 
   String currencyOr(String fallback) =>
       currency.trim().isEmpty ? fallback : currency.trim();
@@ -92,6 +100,7 @@ class Invoice {
         'due_date': dueDate?.millisecondsSinceEpoch,
         'paid_amount': paidAmount,
         'currency': currency,
+        'vat_rate': vatRate,
         'item_count': itemCount,
         'total_qty': totalQuantity,
         'grand_total': grandTotal,
@@ -113,6 +122,7 @@ class Invoice {
             : DateTime.fromMillisecondsSinceEpoch(m['due_date'] as int),
         paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
         currency: (m['currency'] as String?) ?? '',
+        vatRate: (m['vat_rate'] as num?)?.toDouble() ?? 0,
         items: items,
       );
 }

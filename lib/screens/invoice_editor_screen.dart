@@ -41,6 +41,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   final _notes = TextEditingController();
   final _paid = TextEditingController();
   final _currencyCtl = TextEditingController();
+  final _vatCtl = TextEditingController();
   final _filter = TextEditingController();
   final _partyFocus = FocusNode();
 
@@ -68,7 +69,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       inv = (await _db.getInvoice(widget.invoiceId!))!;
       _headerOpen = false;
     } else {
-      inv = Invoice(kind: widget.newKind, number: await _db.nextNumber(widget.newKind));
+      inv = Invoice(
+        kind: widget.newKind,
+        number: await _db.nextNumber(widget.newKind),
+        vatRate: widget.newKind == DocKind.invoice
+            ? SettingsService.instance.defaultVatRate
+            : 0,
+      );
     }
     _catalog = await _db.itemCatalog();
     _partyNames = await _db.partyNames();
@@ -76,6 +83,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _party.text = inv.party;
     _notes.text = inv.notes;
     _currencyCtl.text = inv.currency;
+    _vatCtl.text = inv.vatRate == 0 ? '' : formatQty(inv.vatRate);
     _paid.text = _paidText(inv.status == InvoiceStatus.paid ? inv.grandTotal : inv.paidAmount);
     if (!mounted) return;
     final c = EditorController(inv, dirty: widget.draft != null)
@@ -90,7 +98,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
   @override
   void dispose() {
-    for (final c in [_number, _party, _notes, _paid, _currencyCtl, _filter]) {
+    for (final c in [_number, _party, _notes, _paid, _currencyCtl, _vatCtl, _filter]) {
       c.dispose();
     }
     _partyFocus.dispose();
@@ -442,6 +450,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             itemCount: inv.itemCount,
             totalQty: inv.totalQuantity,
             grandTotal: inv.grandTotal,
+            subtotal: inv.subtotal,
+            vatAmount: inv.vatAmount,
+            vatRate: inv.vatRate,
             currency: _cur,
           ),
         ])),
@@ -579,6 +590,17 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                     ),
                   ),
                 ]),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _vatCtl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (t) => _c!.setVatRate(parseNumber(t) ?? 0),
+                  decoration: const InputDecoration(
+                      labelText: 'ضريبة القيمة المضافة %',
+                      hintText: '0 = بدون ضريبة',
+                      suffixText: '%'),
+                ),
                 const SizedBox(height: 6),
                 Align(
                   alignment: AlignmentDirectional.centerStart,

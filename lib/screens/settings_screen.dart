@@ -21,6 +21,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final _gModel = TextEditingController(text: s.geminiModel);
   late final _oModel = TextEditingController(text: s.openrouterModel);
   late final _prefix = TextEditingController(text: s.numberPrefix);
+  late final _vatNo = TextEditingController(text: s.sellerVat);
+  bool _vatOn = SettingsService.instance.defaultVatRate > 0;
   late final _prefixInv = TextEditingController(text: s.inventoryPrefix);
   late final _start = TextEditingController(text: '${s.numberStart}');
   late final _pad = TextEditingController(text: '${s.numberPadding}');
@@ -37,6 +39,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _oModel.text.isEmpty ? 'google/gemini-2.5-flash' : _oModel.text;
     s.numberPrefix = _prefix.text;
     s.inventoryPrefix = _prefixInv.text;
+    s.sellerVat = normalizeDigits(_vatNo.text);
+    s.defaultVatRate = _vatOn ? 15 : 0;
     s.numberStart = parseNumber(_start.text)?.toInt() ?? 1;
     s.numberPadding = parseNumber(_pad.text)?.toInt() ?? 1;
     s.provider = _provider;
@@ -101,6 +105,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
         TextField(
             controller: _currency,
             decoration: const InputDecoration(labelText: 'رمز العملة')),
+        const SizedBox(height: 24),
+        const Text('ضريبة القيمة المضافة (على طريقة المرحلة الأولى)',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('تطبيق ضريبة 15% على الفواتير الجديدة'),
+          subtitle: const Text('يمكن تعديل النسبة لكل فاتورة'),
+          value: _vatOn,
+          onChanged: (v) => setState(() => _vatOn = v),
+        ),
+        TextField(
+            controller: _vatNo,
+            keyboardType: TextInputType.number,
+            textDirection: TextDirection.ltr,
+            decoration: const InputDecoration(
+                labelText: 'الرقم الضريبي للمنشأة (15 رقماً)')),
+        const SizedBox(height: 6),
+        Text(
+          'عند تعبئة الرقم الضريبي وتفعيل الضريبة يظهر رمز QR بصيغة المرحلة الأولى في ملف PDF. هذا تنسيق فقط وليس اعتماداً من هيئة الزكاة والضريبة والجمارك.',
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+        ),
         const SizedBox(height: 24),
         const Text('ترقيم الفواتير', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),

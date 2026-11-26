@@ -33,6 +33,12 @@ class SettingsService {
   String get companyName => _p.getString('company_name') ?? '';
   set companyName(String v) => _p.setString('company_name', v.trim());
 
+  /// الرقم الضريبي للبائع ونسبة الضريبة الافتراضية للفواتير الجديدة (0 = معطّلة).
+  String get sellerVat => _p.getString('seller_vat') ?? '';
+  set sellerVat(String v) => _p.setString('seller_vat', v.trim());
+  double get defaultVatRate => _p.getDouble('vat_rate') ?? 0;
+  set defaultVatRate(double v) => _p.setDouble('vat_rate', v < 0 ? 0 : v);
+
   String get logoPath => _p.getString('logo_path') ?? '';
   set logoPath(String v) => _p.setString('logo_path', v);
 

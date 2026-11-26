@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../models/invoice.dart';
 import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
+import '../utils/zatca.dart';
 
 /// يولّد ملف PDF عربي (RTL) بخط Amiri المضمّن في assets.
 class PdfService {
@@ -26,6 +27,7 @@ class PdfService {
     Uint8List? logo,
     String partyPhone = '',
     String partyAddress = '',
+    String sellerVat = '',
   }) async {
     await _loadFonts();
     final items = inv.items.where((e) => !e.isEmpty).toList();
@@ -96,6 +98,75 @@ class PdfService {
                     color: headerColor)),
           ]),
         );
+
+    final showVat = inv.kind == DocKind.invoice && inv.vatRate > 0;
+    pw.Widget vatBlock() {
+      final qrOk = sellerVat.trim().isNotEmpty;
+      String? qr;
+      if (qrOk) {
+        final n = DateTime.now();
+        final ts = DateTime(inv.date.year, inv.date.month, inv.date.day,
+            n.hour, n.minute, n.second);
+        qr = zatcaPhase1Qr(
+          sellerName: company.isEmpty ? 'دفتر' : company,
+          vatNumber: normalizeDigits(sellerVat).trim(),
+          timestamp: ts,
+          totalWithVat: inv.grandTotal,
+          vatAmount: inv.vatAmount,
+        );
+      }
+      pw.Widget line(String a, String b, {bool bold = false}) => pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(a,
+                  style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: bold ? pw.FontWeight.bold : null)),
+              pw.Text('$b $currency',
+                  style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: bold ? pw.FontWeight.bold : null)),
+            ],
+          );
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 10),
+        child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Container(
+                width: 230,
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: headerColor, width: .8),
+                  borderRadius: pw.BorderRadius.circular(6),
+                ),
+                child: pw.Column(children: [
+                  line('الإجمالي قبل الضريبة', formatMoney(inv.subtotal)),
+                  pw.SizedBox(height: 3),
+                  line('ضريبة القيمة المضافة (${formatQty(inv.vatRate)}%)',
+                      formatMoney(inv.vatAmount)),
+                  pw.Divider(thickness: .5, color: PdfColors.grey500),
+                  line('الإجمالي شامل الضريبة', formatMoney(inv.grandTotal),
+                      bold: true),
+                ]),
+              ),
+              pw.Spacer(),
+              if (qr != null)
+                pw.Column(children: [
+                  pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(),
+                    data: qr,
+                    width: 86,
+                    height: 86,
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text('رمز QR (صيغة المرحلة الأولى)',
+                      style: const pw.TextStyle(
+                          fontSize: 7, color: PdfColors.grey700)),
+                ]),
+            ]),
+      );
+    }
 
     pw.Widget summary() => pw.Container(
           padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -169,6 +240,11 @@ class PdfService {
                     style: const pw.TextStyle(fontSize: 12)),
               ],
             ),
+            if (showVat && sellerVat.trim().isNotEmpty) ...[
+              pw.SizedBox(height: 2),
+              pw.Text('الرقم الضريبي للمنشأة: ${localizeDigits(normalizeDigits(sellerVat).trim())}',
+                  style: const pw.TextStyle(fontSize: 11)),
+            ],
             if (partyPhone.isNotEmpty || partyAddress.isNotEmpty) ...[
               pw.SizedBox(height: 2),
               pw.Text(
@@ -271,6 +347,7 @@ class PdfService {
               cellAlignments: {4: pw.Alignment.centerRight},
               columnWidths: colWidths,
             ),
+          if (showVat && data.isNotEmpty) vatBlock(),
         ],
       ),
     );
