@@ -6,6 +6,7 @@ import '../utils/insights.dart';
 import '../utils/number_utils.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/responsive.dart';
+import 'statement_screen.dart';
 
 /// الذكاء المالي: تنبيهات ذكية، توقع التحصيل، أعمار الديون، تصنيف العملاء، أفضل الأصناف.
 /// كل التحليل يتم على الجهاز بدون إنترنت.
@@ -238,8 +239,13 @@ class _CustomerTile extends StatelessWidget {
       Risk.medium => ('متأخر', const Color(0xFFF59E0B)),
       Risk.high => ('خطر', const Color(0xFFEF4444)),
     };
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => StatementScreen(party: c.name))),
+      child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
@@ -267,7 +273,11 @@ class _CustomerTile extends StatelessWidget {
           '${c.maxDaysLate > 0 ? ' • أقدم تأخير ${localizeDigits('${c.maxDaysLate}')} يوماً' : ''}',
           style: const TextStyle(fontSize: 12),
         ),
+        const SizedBox(height: 4),
+        Text('اضغط لعرض كشف الحساب', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary)),
       ]),
+    ),
+    ),
     );
   }
 }

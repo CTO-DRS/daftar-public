@@ -6,6 +6,7 @@ import '../models/party.dart';
 import '../services/settings_service.dart';
 import '../utils/number_utils.dart';
 import '../widgets/responsive.dart';
+import 'statement_screen.dart';
 
 /// العملاء والموردون: إضافة وتعديل وحذف، مع عدد فواتير كل طرف وإجماليه.
 class PartiesScreen extends StatefulWidget {
@@ -129,7 +130,17 @@ class _PartiesScreenState extends State<PartiesScreen> {
                                 '${localizeDigits('${s.invoiceCount}')} فاتورة | ${formatMoney(s.total)} $cur',
                               ].join('  |  ')),
                               onTap: () => _edit(s.party),
-                              trailing: IconButton(
+                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                if (s.invoiceCount > 0)
+                                  IconButton(
+                                    tooltip: 'كشف حساب',
+                                    icon: const Icon(Icons.receipt_long_outlined),
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) => StatementScreen(party: s.party.name))),
+                                  ),
+                                IconButton(
                                 tooltip: 'حذف',
                                 icon: const Icon(Icons.delete_outline),
                                 onPressed: () async {
@@ -137,6 +148,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
                                   _load();
                                 },
                               ),
+                              ]),
                             ),
                           );
                         },

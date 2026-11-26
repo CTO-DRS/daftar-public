@@ -6,6 +6,7 @@ import '../models/invoice.dart';
 import '../utils/brand_color.dart';
 import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
+import '../utils/statement.dart';
 import '../utils/zatca.dart';
 
 /// قوالب الفاتورة: كلاسيكي، عصري، مختصر.
@@ -40,6 +41,128 @@ class PdfService {
     _plex ??= await f('IBMPlexSansArabic-Regular');
     _plexBold ??= await f('IBMPlexSansArabic-Bold');
   }
+
+  /// كشف حساب عميل/مورد بصيغة PDF عربي.
+  static Future<Uint8List> buildStatementPdf(
+    Statement st, {
+    String currency = 'ر.س',
+    String company = '',
+    Uint8List? logo,
+    String partyPhone = '',
+    DateTime? now,
+    int? brandColor,
+    PdfTemplate template = PdfTemplate.classic,
+  }) async {
+    await _loadFonts();
+    final modern = template == PdfTemplate.modern;
+    final theme = modern
+        ? pw.ThemeData.withFont(base: _plex!, bold: _plexBold!)
+        : pw.ThemeData.withFont(base: _amiri!, bold: _amiriBold!);
+    final brand = PdfColor.fromInt(resolveBrandColor(chosen: brandColor, logo: logo));
+    final tint = PdfColor(brand.red + (1 - brand.red) * .9,
+        brand.green + (1 - brand.green) * .9, brand.blue + (1 - brand.blue) * .9);
+    final name = company.isEmpty ? 'دفتر' : company;
+    final today = now ?? DateTime.now();
+    final doc = pw.Document(title: 'كشف حساب ${st.party}', author: name);
+    final headers = ['الرصيد', 'المسدَّد', 'المبلغ', 'الاستحقاق', 'البيان', 'التاريخ'];
+    final data = [
+      for (final r in st.rows)
+        [
+          formatMoney(r.balance),
+          r.paid > 0.005 ? formatMoney(r.paid) : '-',
+          formatMoney(r.amount),
+          r.due == null ? '-' : formatDate(r.due!),
+          r.label,
+          formatDate(r.date),
+        ]
+    ];
+    final logoImage = logo == null ? null : pw.MemoryImage(logo);
+    final owes = st.balance > 0.005;
+    doc.addPage(pw.MultiPage(
+      pageTheme: pw.PageTheme(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(28, 26, 28, 28),
+        theme: theme,
+        textDirection: pw.TextDirection.rtl,
+      ),
+      footer: (c) => pw.Align(
+          alignment: pw.Alignment.center,
+          child: pw.Text('${localizeDigits('${c.pageNumber}')} / ${localizeDigits('${c.pagesCount}')}',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600))),
+      build: (c) => [
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+          if (logoImage != null) pw.Container(width: 46, height: 46, margin: const pw.EdgeInsetsDirectional.only(end: 10), child: pw.Image(logoImage)),
+          pw.Expanded(child: pw.Text(name, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: brand))),
+          pw.Text('كشف حساب', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+        ]),
+        pw.Divider(color: brand, thickness: 1.2),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(color: tint, borderRadius: pw.BorderRadius.circular(6)),
+          child: pw.Row(children: [
+            pw.Expanded(
+                child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text(st.party, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              if (partyPhone.isNotEmpty) pw.Text(localizeDigits(partyPhone), style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            ])),
+            pw.Text('بتاريخ ${formatDate(today)}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+          ]),
+        ),
+        pw.SizedBox(height: 12),
+        if (data.isEmpty)
+          pw.Padding(padding: const pw.EdgeInsets.all(20), child: pw.Center(child: pw.Text('لا توجد مستندات معتمدة لهذا الطرف.')))
+        else
+          pw.TableHelper.fromTextArray(
+            headers: headers,
+            data: data,
+            border: pw.TableBorder(
+              horizontalInside: const pw.BorderSide(color: PdfColors.grey300, width: .5),
+              bottom: pw.BorderSide(color: brand, width: 1),
+            ),
+            headerDecoration: pw.BoxDecoration(color: modern ? tint : brand),
+            headerStyle: pw.TextStyle(color: modern ? brand : PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10),
+            cellStyle: const pw.TextStyle(fontSize: 10),
+            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+            headerAlignment: pw.Alignment.center,
+            cellAlignment: pw.Alignment.center,
+            cellAlignments: {4: pw.Alignment.centerRight},
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.5),
+              1: const pw.FlexColumnWidth(1.4),
+              2: const pw.FlexColumnWidth(1.4),
+              3: const pw.FlexColumnWidth(1.5),
+              4: const pw.FlexColumnWidth(2.4),
+              5: const pw.FlexColumnWidth(1.5),
+            },
+          ),
+        pw.SizedBox(height: 14),
+        pw.Align(
+          alignment: pw.Alignment.centerLeft,
+          child: pw.Container(
+            width: 230,
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: brand, width: 1), borderRadius: pw.BorderRadius.circular(6)),
+            child: pw.Column(children: [
+              _srow('إجمالي المستندات', '${formatMoney(st.totalAmount)} $currency'),
+              _srow('إجمالي المسدَّد', '${formatMoney(st.totalPaid)} $currency'),
+              pw.Divider(color: PdfColors.grey400, height: 10),
+              _srow(owes ? 'الرصيد المستحق' : 'الرصيد', '${formatMoney(st.balance.abs())} $currency',
+                  bold: true, color: owes ? PdfColors.red800 : brand),
+            ]),
+          ),
+        ),
+      ],
+    ));
+    return doc.save();
+  }
+
+  static pw.Widget _srow(String a, String b, {bool bold = false, PdfColor? color}) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+        child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          pw.Text(a, style: pw.TextStyle(fontSize: bold ? 12 : 10.5, fontWeight: bold ? pw.FontWeight.bold : null)),
+          pw.Text(b, style: pw.TextStyle(fontSize: bold ? 13 : 10.5, fontWeight: bold ? pw.FontWeight.bold : null, color: color)),
+        ]),
+      );
 
   static Future<Uint8List> build(
     Invoice inv, {
