@@ -40,6 +40,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   final _party = TextEditingController();
   final _notes = TextEditingController();
   final _paid = TextEditingController();
+  final _currencyCtl = TextEditingController();
   final _filter = TextEditingController();
   final _partyFocus = FocusNode();
 
@@ -49,7 +50,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   double get _pinnedPrice => _c?.pinnedPrice ?? 0;
   String get _pinnedType => _c?.pinnedType ?? '';
 
-  String get _cur => SettingsService.instance.currency;
+  String get _cur =>
+      _inv?.currencyOr(SettingsService.instance.currency) ??
+      SettingsService.instance.currency;
 
   @override
   void initState() {
@@ -72,6 +75,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _number.text = inv.number;
     _party.text = inv.party;
     _notes.text = inv.notes;
+    _currencyCtl.text = inv.currency;
     _paid.text = _paidText(inv.status == InvoiceStatus.paid ? inv.grandTotal : inv.paidAmount);
     if (!mounted) return;
     final c = EditorController(inv, dirty: widget.draft != null)
@@ -86,7 +90,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
   @override
   void dispose() {
-    for (final c in [_number, _party, _notes, _paid, _filter]) {
+    for (final c in [_number, _party, _notes, _paid, _currencyCtl, _filter]) {
       c.dispose();
     }
     _partyFocus.dispose();
@@ -101,6 +105,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     inv.number = _number.text.trim().isEmpty ? inv.number : _number.text.trim();
     inv.party = _party.text.trim();
     inv.notes = _notes.text.trim();
+    inv.currency = _currencyCtl.text.trim();
     if (inv.status == InvoiceStatus.paid) inv.paidAmount = inv.grandTotal;
   }
 
@@ -591,6 +596,17 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   ),
                 ),
               ],
+              const SizedBox(height: 10),
+              TextField(
+                controller: _currencyCtl,
+                onChanged: (_) {
+                  _syncHeader();
+                  _touch();
+                },
+                decoration: InputDecoration(
+                    labelText: 'العملة (اختياري)',
+                    hintText: SettingsService.instance.currency),
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: _notes,

@@ -30,7 +30,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
         widget.invoice,
         partyPhone: party?.phone ?? '',
         partyAddress: party?.address ?? '',
-        currency: SettingsService.instance.currency,
+        currency: widget.invoice.currencyOr(SettingsService.instance.currency),
         company: SettingsService.instance.companyName,
         logo: await LogoService.load(),
     );

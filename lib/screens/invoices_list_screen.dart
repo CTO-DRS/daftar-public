@@ -190,7 +190,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text('${formatMoney(s.grandTotal)} $cur',
+                                    Text('${formatMoney(s.grandTotal)} ${inv.currencyOr(cur)}',
                                         style: const TextStyle(
                                             fontWeight: FontWeight.w800)),
                                     if (inv.kind == DocKind.invoice &&

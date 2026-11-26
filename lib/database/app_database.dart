@@ -42,7 +42,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 4,
+      version: 5,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -55,6 +55,9 @@ class AppDatabase {
           await d.execute('ALTER TABLE invoices ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0');
           // الفواتير المدفوعة سابقاً تُسجَّل كمسددة بالكامل.
           await d.execute("UPDATE invoices SET paid_amount = grand_total WHERE status = 'paid'");
+        }
+        if (o < 5) {
+          await d.execute("ALTER TABLE invoices ADD COLUMN currency TEXT NOT NULL DEFAULT ''");
         }
       },
       onConfigure: (d) => d.execute('PRAGMA foreign_keys = ON'),
@@ -71,6 +74,7 @@ class AppDatabase {
             updated_at INTEGER NOT NULL,
             due_date INTEGER,
             paid_amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT '',
             item_count INTEGER NOT NULL DEFAULT 0,
             total_qty REAL NOT NULL DEFAULT 0,
             grand_total REAL NOT NULL DEFAULT 0
@@ -164,9 +168,10 @@ class AppDatabase {
     final copy = Invoice(
       kind: src.kind,
       status: InvoiceStatus.draft,
-      number: await nextNumber(),
+      number: await nextNumber(src.kind),
       party: src.party,
       notes: src.notes,
+      currency: src.currency,
       items: src.items.map((e) => e.copy()..id = null).toList(),
     );
     return saveInvoice(copy);

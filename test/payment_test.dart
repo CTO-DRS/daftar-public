@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   emptyRowTests();
+  currencyTests();
   Invoice mk({InvoiceStatus st = InvoiceStatus.confirmed, double paid = 0, DateTime? due}) =>
       Invoice(number: '1', status: st, paidAmount: paid, dueDate: due, items: [
         InvoiceItem(quantity: 2, unitPrice: 50),
@@ -43,5 +44,14 @@ void emptyRowTests() {
     expect(inv.items[0].isEmpty, isTrue);
     expect(inv.items[2].isEmpty, isFalse);
     expect(inv.itemCount, 2);
+  });
+}
+
+void currencyTests() {
+  test('per-document currency falls back to settings and round-trips', () {
+    final inv = Invoice(number: '1', currency: ' USD ');
+    expect(inv.currencyOr('ر.س'), 'USD');
+    expect(Invoice(number: '2').currencyOr('ر.س'), 'ر.س');
+    expect(Invoice.fromMap(inv.toMap()).currency, ' USD ');
   });
 }

@@ -40,6 +40,7 @@ class Invoice {
   DateTime updatedAt;
   DateTime? dueDate; // تاريخ الاستحقاق
   double paidAmount; // المبلغ المدفوع
+  String currency; // عملة هذا المستند (فارغ = عملة الإعدادات)
   List<InvoiceItem> items;
 
   Invoice({
@@ -53,6 +54,7 @@ class Invoice {
     DateTime? updatedAt,
     this.dueDate,
     this.paidAmount = 0,
+    this.currency = '',
     List<InvoiceItem>? items,
   })  : date = date ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
@@ -66,6 +68,9 @@ class Invoice {
 
   /// المبلغ الإجمالي النهائي.
   double get grandTotal => items.fold(0.0, (s, i) => s + i.total);
+
+  String currencyOr(String fallback) =>
+      currency.trim().isEmpty ? fallback : currency.trim();
 
   /// المتبقي بعد الدفعات.
   double get remaining => paymentRemaining(grandTotal, paidAmount, status);
@@ -86,6 +91,7 @@ class Invoice {
         'updated_at': updatedAt.millisecondsSinceEpoch,
         'due_date': dueDate?.millisecondsSinceEpoch,
         'paid_amount': paidAmount,
+        'currency': currency,
         'item_count': itemCount,
         'total_qty': totalQuantity,
         'grand_total': grandTotal,
@@ -106,6 +112,7 @@ class Invoice {
             ? null
             : DateTime.fromMillisecondsSinceEpoch(m['due_date'] as int),
         paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
+        currency: (m['currency'] as String?) ?? '',
         items: items,
       );
 }
