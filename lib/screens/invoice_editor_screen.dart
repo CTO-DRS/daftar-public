@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../database/app_database.dart';
 import '../models/invoice.dart';
 import '../models/invoice_item.dart';
+import '../services/editor_controller.dart';
 import '../services/settings_service.dart';
 import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
@@ -30,7 +31,7 @@ class InvoiceEditorScreen extends StatefulWidget {
 class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   final _db = AppDatabase.instance;
   Invoice? _inv;
-  bool _dirty = false;
+  EditorController? _c;
   bool _headerOpen = true;
   Map<String, InvoiceItem> _catalog = {};
   List<String> _partyNames = [];
@@ -42,14 +43,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   final _filter = TextEditingController();
   final _partyFocus = FocusNode();
 
-  // تثبيت السعر والنوع
-  bool _pinPrice = false;
-  bool _pinType = false;
-  double _pinnedPrice = 0;
-  String _pinnedType = '';
-
-  SortField _sortField = SortField.itemCode;
-  bool _asc = true;
+  bool get _dirty => _c?.dirty ?? false;
+  bool get _pinPrice => _c?.pinPrice ?? false;
+  bool get _pinType => _c?.pinType ?? false;
+  double get _pinnedPrice => _c?.pinnedPrice ?? 0;
+  String get _pinnedType => _c?.pinnedType ?? '';
 
   String get _cur => SettingsService.instance.currency;
 
@@ -63,7 +61,6 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     Invoice inv;
     if (widget.draft != null) {
       inv = widget.draft!;
-      _dirty = true;
     } else if (widget.invoiceId != null) {
       inv = (await _db.getInvoice(widget.invoiceId!))!;
       _headerOpen = false;
@@ -77,7 +74,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _notes.text = inv.notes;
     _paid.text = _paidText(inv.status == InvoiceStatus.paid ? inv.grandTotal : inv.paidAmount);
     if (!mounted) return;
-    setState(() => _inv = inv);
+    final c = EditorController(inv, dirty: widget.draft != null)
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
+    setState(() {
+      _inv = inv;
+      _c = c;
+    });
   }
 
   @override
@@ -86,10 +90,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       c.dispose();
     }
     _partyFocus.dispose();
+    _c?.dispose();
     super.dispose();
   }
 
-  void _touch() => setState(() => _dirty = true);
+  void _touch() => _c!.markDirty();
 
   void _syncHeader() {
     final inv = _inv!;
@@ -101,17 +106,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
   String _paidText(double v) => v == 0 ? '' : formatQty(v);
 
-  void _onPaidChanged(String t) {
-    final inv = _inv!;
-    final v = parseNumber(t) ?? 0;
-    inv.paidAmount = v < 0 ? 0 : v;
-    if (inv.grandTotal > 0 && inv.paidAmount >= inv.grandTotal - 0.005) {
-      inv.status = InvoiceStatus.paid;
-    } else if (inv.status == InvoiceStatus.paid) {
-      inv.status = InvoiceStatus.confirmed;
-    }
-    _touch();
-  }
+  void _onPaidChanged(String t) => _c!.setPaidAmount(parseNumber(t) ?? 0);
 
   Future<void> _pickDue() async {
     final inv = _inv!;
@@ -132,7 +127,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _syncHeader();
     await _db.saveInvoice(inv);
     if (mounted) {
-      setState(() => _dirty = false);
+      _c!.markSaved();
       if (!quiet) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('تم الحفظ')));
@@ -141,17 +136,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     return true;
   }
 
-  InvoiceItem _blank() => InvoiceItem(
-        quantity: 0,
-        unitPrice: _pinPrice ? _pinnedPrice : 0,
-        description: _pinType ? _pinnedType : '',
-      );
-
   Future<void> _editItem(InvoiceItem? existing) async {
     var current = existing;
     var isNew = current == null;
     while (true) {
-      final item = current ?? _blank();
+      final item = current ?? _c!.blank();
       final r = await showItemEditSheet(
         context,
         item: item,
@@ -161,19 +150,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         catalog: _catalog,
       );
       if (r == null || !mounted) return;
-      setState(() {
-        _pinPrice = r.pinPrice;
-        _pinType = r.pinType;
-        if (r.pinPrice) _pinnedPrice = r.item.unitPrice;
-        if (r.pinType) _pinnedType = r.item.description;
-        if (isNew) {
-          _inv!.items.add(r.item);
-        } else {
-          final i = _inv!.items.indexOf(item);
-          if (i >= 0) _inv!.items[i] = r.item;
-        }
-        _dirty = true;
-      });
+      _c!.applyEdit(isNew ? null : item, r.item,
+          pinPrice: r.pinPrice, pinType: r.pinType);
       if (r.addNext) {
         current = null;
         isNew = true;
@@ -226,44 +204,66 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     );
     c.dispose();
     if (n == null || n <= 0) return;
-    setState(() {
-      for (var i = 0; i < n; i++) {
-        _inv!.items.add(_blank());
-      }
-      _dirty = true;
-    });
+    _c!.addBlanks(n);
   }
 
   void _delete(InvoiceItem item) {
-    final i = _inv!.items.indexOf(item);
+    final i = _c!.remove(item);
     if (i < 0) return;
-    setState(() {
-      _inv!.items.removeAt(i);
-      _dirty = true;
-    });
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
         content: const Text('تم حذف السطر'),
         action: SnackBarAction(
           label: 'تراجع',
-          onPressed: () => setState(() {
-            _inv!.items.insert(i.clamp(0, _inv!.items.length), item);
-            _dirty = true;
-          }),
+          onPressed: () => _c!.restore(i, item),
         ),
       ));
   }
 
-  void _duplicate(InvoiceItem item) {
-    final i = _inv!.items.indexOf(item);
-    setState(() {
-      _inv!.items.insert(i + 1, item.copy()..id = null);
-      _dirty = true;
-    });
+  void _duplicate(InvoiceItem item) => _c!.duplicate(item);
+
+  /// تكرار السطر N مرة (الكود والمرجع والنوع والسعر) والعدد فارغ لكل نسخة.
+  Future<void> _duplicateMany(InvoiceItem item) async {
+    final ctl = TextEditingController(text: '5');
+    final n = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تكرار السطر'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('تُنسخ بيانات السطر (الكود، المرجع، النوع، السعر) ويُترك العدد فارغاً.',
+              style: TextStyle(fontSize: 13)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'عدد النسخ (حتى 100)'),
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, children: [
+            for (final v in [2, 5, 10, 15])
+              ActionChip(label: Text('$v'), onPressed: () => ctl.text = '$v'),
+          ]),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+                ctx, (parseNumber(ctl.text)?.toInt() ?? 0).clamp(0, 100)),
+            child: const Text('تكرار'),
+          ),
+        ],
+      ),
+    );
+    ctl.dispose();
+    if (n == null || n <= 0 || !mounted) return;
+    _c!.duplicate(item, times: n, keepQuantity: false);
   }
 
   Future<void> _sortSheet() async {
+    final c = _c!;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -275,17 +275,23 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 minTileHeight: 52,
                 leading: Icon(asc ? Icons.arrow_upward : Icons.arrow_downward),
                 title: Text('${f.label} ${asc ? 'تصاعدياً' : 'تنازلياً'}'),
-                selected: _sortField == f && _asc == asc,
+                selected: c.sortField == f && c.sortAsc == asc,
                 onTap: () {
                   Navigator.pop(ctx);
-                  setState(() {
-                    _sortField = f;
-                    _asc = asc;
-                    sortItems(_inv!.items, f, asc);
-                    _dirty = true;
-                  });
+                  c.sortBy(f, asc);
                 },
               ),
+          const Divider(height: 1),
+          ListTile(
+            minTileHeight: 52,
+            leading: const Icon(Icons.restore),
+            title: const Text('استعادة ترتيب الإدخال الأصلي'),
+            enabled: c.canRestoreOrder,
+            onTap: () {
+              Navigator.pop(ctx);
+              c.restoreOriginalOrder();
+            },
+          ),
         ]),
       ),
     );
@@ -326,15 +332,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     if (inv == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final q = normalizeDigits(_filter.text).trim().toLowerCase();
-    final visible = <int>[];
-    for (var i = 0; i < inv.items.length; i++) {
-      final it = inv.items[i];
-      if (q.isEmpty ||
-          itemMatchesQuery(it, q)) {
-        visible.add(i);
-      }
-    }
+    final visible = _c!.visibleIndices;
 
     return PopScope(
       canPop: false,
@@ -402,6 +400,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                                 item: it,
                                 onTap: () => _editItem(it),
                                 onDuplicate: () => _duplicate(it),
+                                onDuplicateMany: () => _duplicateMany(it),
                                 onDelete: () => _delete(it),
                               ),
                             ),
@@ -501,17 +500,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                       label: Text(st.label),
                       selected: inv.status == st,
                       onSelected: (_) {
-                        setState(() {
-                          final wasPaid = inv.status == InvoiceStatus.paid;
-                          inv.status = st;
-                          if (st == InvoiceStatus.paid) {
-                            inv.paidAmount = inv.grandTotal;
-                          } else if (wasPaid) {
-                            inv.paidAmount = 0;
-                          }
-                          _paid.text = _paidText(inv.paidAmount);
-                        });
-                        _touch();
+                        _c!.setStatus(st);
+                        _paid.text = _paidText(inv.paidAmount);
                       },
                     ),
                 ]),
@@ -620,7 +610,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       child: Column(children: [
         TextField(
           controller: _filter,
-          onChanged: (_) => setState(() {}),
+          onChanged: (v) => _c!.setQuery(v),
           decoration: InputDecoration(
             hintText: 'بحث في الأسطر (كود، مرجع، نوع، رقم)',
             prefixIcon: const Icon(Icons.filter_list),
@@ -629,7 +619,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 ? null
                 : IconButton(
                     icon: const Icon(Icons.clear),
-                    onPressed: () => setState(() => _filter.clear())),
+                    onPressed: () {
+                      _filter.clear();
+                      _c!.setQuery('');
+                    }),
           ),
         ),
         if (_pinPrice || _pinType)
@@ -640,13 +633,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 InputChip(
                   avatar: const Icon(Icons.push_pin, size: 16),
                   label: Text('النوع: $_pinnedType'),
-                  onDeleted: () => setState(() => _pinType = false),
+                  onDeleted: () => _c!.clearPinType(),
                 ),
               if (_pinPrice)
                 InputChip(
                   avatar: const Icon(Icons.push_pin, size: 16),
                   label: Text('السعر: ${formatMoney(_pinnedPrice)}'),
-                  onDeleted: () => setState(() => _pinPrice = false),
+                  onDeleted: () => _c!.clearPinPrice(),
                 ),
             ]),
           ),

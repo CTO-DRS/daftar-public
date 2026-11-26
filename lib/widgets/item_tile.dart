@@ -9,6 +9,7 @@ class ItemTile extends StatelessWidget {
   final InvoiceItem item;
   final VoidCallback onTap;
   final VoidCallback onDuplicate;
+  final VoidCallback? onDuplicateMany;
   final VoidCallback onDelete;
 
   const ItemTile({
@@ -17,6 +18,7 @@ class ItemTile extends StatelessWidget {
     required this.item,
     required this.onTap,
     required this.onDuplicate,
+    this.onDuplicateMany,
     required this.onDelete,
   });
 
@@ -97,10 +99,17 @@ class ItemTile extends StatelessWidget {
                 height: 48,
                 child: PopupMenuButton<String>(
                   tooltip: 'خيارات السطر',
-                  onSelected: (v) => v == 'dup' ? onDuplicate() : onDelete(),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'dup', child: Text('تكرار السطر')),
-                    PopupMenuItem(value: 'del', child: Text('حذف السطر')),
+                  onSelected: (v) => v == 'dup'
+                      ? onDuplicate()
+                      : v == 'dupn'
+                          ? onDuplicateMany!()
+                          : onDelete(),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'dup', child: Text('تكرار السطر')),
+                    if (onDuplicateMany != null)
+                      const PopupMenuItem(
+                          value: 'dupn', child: Text('تكرار عدة مرات...')),
+                    const PopupMenuItem(value: 'del', child: Text('حذف السطر')),
                   ],
                 ),
               ),
