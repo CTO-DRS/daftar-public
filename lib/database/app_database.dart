@@ -17,13 +17,19 @@ class AppDatabase {
     final path = p.join(await getDatabasesPath(), 'daftar.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
+      onUpgrade: (d, o, n) async {
+        if (o < 2) {
+          await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
+        }
+      },
       onConfigure: (d) => d.execute('PRAGMA foreign_keys = ON'),
       onCreate: (d, v) async {
         await d.execute('''
           CREATE TABLE invoices(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kind TEXT NOT NULL DEFAULT 'invoice',
+            status TEXT NOT NULL DEFAULT 'draft',
             number TEXT NOT NULL,
             date INTEGER NOT NULL,
             party TEXT NOT NULL DEFAULT '',
@@ -118,6 +124,7 @@ class AppDatabase {
     if (src == null) throw StateError('الفاتورة غير موجودة');
     final copy = Invoice(
       kind: src.kind,
+      status: InvoiceStatus.draft,
       number: await nextNumber(),
       party: src.party,
       notes: src.notes,
@@ -136,5 +143,32 @@ class AppDatabase {
       if (n != null && n > max) max = n;
     }
     return '${max + 1}';
+  }
+}
+
+extension CatalogQueries on AppDatabase {
+  /// أسماء العملاء/الموردين السابقة (للإكمال التلقائي).
+  Future<List<String>> knownParties() async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT party FROM invoices WHERE party != '' GROUP BY party ORDER BY MAX(updated_at) DESC LIMIT 200");
+    return r.map((e) => e['party'] as String).toList();
+  }
+
+  /// آخر استخدام لكل كود صنف: الوصف والسعر (كتالوج الأصناف المحفوظ تلقائياً).
+  Future<Map<String, InvoiceItem>> itemCatalog() async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT i.item_code, i.ref_number, i.description, i.unit_price FROM items i "
+        "JOIN (SELECT item_code, MAX(id) mid FROM items WHERE item_code != '' GROUP BY item_code) t ON i.id = t.mid");
+    return {
+      for (final m in r)
+        m['item_code'] as String: InvoiceItem(
+          itemCode: m['item_code'] as String,
+          refNumber: (m['ref_number'] as String?) ?? '',
+          description: (m['description'] as String?) ?? '',
+          unitPrice: (m['unit_price'] as num?)?.toDouble() ?? 0,
+        )
+    };
   }
 }

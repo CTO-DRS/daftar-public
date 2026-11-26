@@ -45,7 +45,7 @@ class ItemTile extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                   color: cs.primaryContainer, shape: BoxShape.circle),
-              child: Text('$index',
+              child: Text(localizeDigits('$index'),
                   style: const TextStyle(
                       fontWeight: FontWeight.w700, fontSize: 13)),
             ),

@@ -28,7 +28,7 @@ class TotalsBar extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(children: [
-            _Stat(label: 'الأصناف', value: '$itemCount'),
+            _Stat(label: 'الأصناف', value: localizeDigits('$itemCount')),
             _divider(),
             _Stat(label: 'القطع', value: formatQty(totalQty)),
             _divider(),

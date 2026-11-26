@@ -33,5 +33,8 @@ class SettingsService {
   String get companyName => _p.getString('company_name') ?? '';
   set companyName(String v) => _p.setString('company_name', v.trim());
 
+  bool get arabicDigits => _p.getBool('arabic_digits') ?? false;
+  set arabicDigits(bool v) => _p.setBool('arabic_digits', v);
+
   bool get oneHandedBarBottom => _p.getBool('one_hand') ?? true;
 }

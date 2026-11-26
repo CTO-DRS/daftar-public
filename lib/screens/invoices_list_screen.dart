@@ -159,7 +159,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '${inv.kind.label} ${inv.number}'
+                                        '${inv.kind.label} ${localizeDigits(inv.number)}'
                                         '${inv.party.isEmpty ? '' : ' - ${inv.party}'}',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -169,7 +169,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${formatDate(inv.date)}  |  ${s.itemCount} صنف  |  ${formatQty(s.totalQty)} قطعة',
+                                        '${inv.status.label}  |  ${formatDate(inv.date)}  |  ${localizeDigits('${s.itemCount}')} صنف  |  ${formatQty(s.totalQty)} قطعة',
                                         style: TextStyle(
                                             color: Colors.grey.shade700,
                                             fontSize: 13),

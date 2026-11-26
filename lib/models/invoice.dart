@@ -10,9 +10,29 @@ extension DocKindX on DocKind {
       v == 'inventory' ? DocKind.inventory : DocKind.invoice;
 }
 
+/// حالة المستند.
+enum InvoiceStatus { draft, confirmed, paid }
+
+extension InvoiceStatusX on InvoiceStatus {
+  String get label {
+    switch (this) {
+      case InvoiceStatus.draft:
+        return 'مسودة';
+      case InvoiceStatus.confirmed:
+        return 'معتمدة';
+      case InvoiceStatus.paid:
+        return 'مدفوعة';
+    }
+  }
+
+  static InvoiceStatus fromDb(String? v) => InvoiceStatus.values
+      .firstWhere((e) => e.name == v, orElse: () => InvoiceStatus.draft);
+}
+
 class Invoice {
   int? id;
   DocKind kind;
+  InvoiceStatus status;
   String number;
   DateTime date;
   String party; // اسم العميل / المورد
@@ -23,6 +43,7 @@ class Invoice {
   Invoice({
     this.id,
     this.kind = DocKind.invoice,
+    this.status = InvoiceStatus.draft,
     required this.number,
     DateTime? date,
     this.party = '',
@@ -45,6 +66,7 @@ class Invoice {
   Map<String, Object?> toMap() => {
         'id': id,
         'kind': kind.dbValue,
+        'status': status.name,
         'number': number,
         'date': date.millisecondsSinceEpoch,
         'party': party,
@@ -59,6 +81,7 @@ class Invoice {
       Invoice(
         id: m['id'] as int?,
         kind: DocKindX.fromDb(m['kind'] as String?),
+        status: InvoiceStatusX.fromDb(m['status'] as String?),
         number: (m['number'] as String?) ?? '',
         date: DateTime.fromMillisecondsSinceEpoch((m['date'] as int?) ?? 0),
         party: (m['party'] as String?) ?? '',

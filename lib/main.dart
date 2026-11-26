@@ -3,10 +3,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'screens/invoices_list_screen.dart';
 import 'services/settings_service.dart';
+import 'utils/number_utils.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService.instance.init();
+  useArabicDigits = SettingsService.instance.arabicDigits;
   runApp(const DaftarApp());
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/settings_service.dart';
+import '../utils/number_utils.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,6 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final _oModel = TextEditingController(text: s.openrouterModel);
   late OcrProvider _provider = s.provider;
   bool _hide = true;
+  bool _arabicDigits = SettingsService.instance.arabicDigits;
 
   void _save() {
     s.apiKey = _key.text;
@@ -26,6 +28,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     s.openrouterModel =
         _oModel.text.isEmpty ? 'google/gemini-2.5-flash' : _oModel.text;
     s.provider = _provider;
+    s.arabicDigits = _arabicDigits;
+    useArabicDigits = _arabicDigits;
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('تم حفظ الإعدادات')));
     Navigator.pop(context);
@@ -46,6 +50,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         TextField(
             controller: _currency,
             decoration: const InputDecoration(labelText: 'رمز العملة')),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('عرض الأرقام بالهندية (١٢٣)'),
+          subtitle: const Text('يؤثر على الشاشات وملف PDF'),
+          value: _arabicDigits,
+          onChanged: (v) => setState(() => _arabicDigits = v),
+        ),
         const SizedBox(height: 24),
         const Text('مسح الفواتير بالذكاء الاصطناعي',
             style: TextStyle(fontWeight: FontWeight.w800)),

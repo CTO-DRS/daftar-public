@@ -5,6 +5,7 @@ import 'package:daftar/utils/number_utils.dart';
 import 'package:daftar/utils/sort_utils.dart';
 
 void main() {
+  digitTests();
   test('Arabic-Indic digits parse', () {
     expect(parseNumber('١٢٣'), 123);
     expect(parseNumber('١٢٫٥'), 12.5);
@@ -34,5 +35,14 @@ void main() {
     expect(items.map((e) => e.itemCode), ['A1', 'A2', 'A10']);
     sortItems(items, SortField.itemCode, false);
     expect(items.map((e) => e.itemCode), ['A10', 'A2', 'A1']);
+  });
+}
+
+void digitTests() {
+  test('Arabic-Indic digit display option', () {
+    useArabicDigits = true;
+    expect(formatMoney(1250.5), '١٬٢٥٠٫٥');
+    useArabicDigits = false;
+    expect(formatMoney(1250.5), '1,250.5');
   });
 }

@@ -56,7 +56,7 @@ class PdfService {
         it.description,
         it.refNumber,
         it.itemCode,
-        '${i + 1}',
+        localizeDigits('${i + 1}'),
       ]);
     }
 
@@ -69,7 +69,7 @@ class PdfService {
           child: pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('عدد الأصناف: ${inv.itemCount}',
+              pw.Text('عدد الأصناف: ${localizeDigits('${inv.itemCount}')}',
                   style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
               pw.Text('إجمالي القطع: ${formatQty(inv.totalQuantity)}',
                   style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
@@ -104,7 +104,7 @@ class PdfService {
                       color: headerColor),
                 ),
                 pw.Text(
-                  '${inv.kind.label} رقم ${inv.number}',
+                  '${inv.kind.label} رقم ${localizeDigits(inv.number)}',
                   style: pw.TextStyle(
                       fontSize: 18, fontWeight: pw.FontWeight.bold),
                 ),
@@ -117,7 +117,7 @@ class PdfService {
                 pw.Text(
                     'اسم العميل / المورد: ${inv.party.isEmpty ? '-' : inv.party}',
                     style: const pw.TextStyle(fontSize: 12)),
-                pw.Text('التاريخ: ${formatDate(inv.date)}',
+                pw.Text('التاريخ: ${formatDate(inv.date)}   |   الحالة: ${inv.status.label}',
                     style: const pw.TextStyle(fontSize: 12)),
               ],
             ),
@@ -137,7 +137,7 @@ class PdfService {
           pw.SizedBox(height: 4),
           pw.Align(
             alignment: pw.Alignment.center,
-            child: pw.Text('صفحة ${ctx.pageNumber} من ${ctx.pagesCount}',
+            child: pw.Text('صفحة ${localizeDigits('${ctx.pageNumber}')} من ${localizeDigits('${ctx.pagesCount}')}',
                 style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
           ),
         ]),

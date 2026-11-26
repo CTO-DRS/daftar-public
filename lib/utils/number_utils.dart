@@ -47,8 +47,30 @@ double? parseNumber(String? input) {
 final NumberFormat _money = NumberFormat('#,##0.##', 'en');
 final NumberFormat _qty = NumberFormat('#,##0.###', 'en');
 
-String formatMoney(double v) => _money.format(v);
-String formatQty(double v) => _qty.format(v);
+/// خيار عرض الأرقام بالهندية (٠١٢٣) بدل اللاتينية. يُضبط من الإعدادات.
+bool useArabicDigits = false;
+
+String localizeDigits(String s) {
+  if (!useArabicDigits) return s;
+  final sb = StringBuffer();
+  for (final r in s.runes) {
+    final ch = String.fromCharCode(r);
+    final i = '0123456789'.indexOf(ch);
+    if (i >= 0) {
+      sb.write(_arabicIndic[i]);
+    } else if (ch == '.') {
+      sb.write('٫');
+    } else if (ch == ',') {
+      sb.write('٬');
+    } else {
+      sb.write(ch);
+    }
+  }
+  return sb.toString();
+}
+
+String formatMoney(double v) => localizeDigits(_money.format(v));
+String formatQty(double v) => localizeDigits(_qty.format(v));
 
 /// نص قابل للتحرير: بدون أصفار زائدة ولا فواصل آلاف.
 String plainNumber(double v) {

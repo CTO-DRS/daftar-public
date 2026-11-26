@@ -18,13 +18,18 @@ Future<ItemEditResult?> showItemEditSheet(
   required bool isNew,
   required bool pinPrice,
   required bool pinType,
+  Map<String, InvoiceItem> catalog = const {},
 }) {
   return showModalBottomSheet<ItemEditResult>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     builder: (_) => _ItemEditSheet(
-        item: item, isNew: isNew, pinPrice: pinPrice, pinType: pinType),
+        item: item,
+        isNew: isNew,
+        pinPrice: pinPrice,
+        pinType: pinType,
+        catalog: catalog),
   );
 }
 
@@ -33,8 +38,10 @@ class _ItemEditSheet extends StatefulWidget {
   final bool isNew;
   final bool pinPrice;
   final bool pinType;
+  final Map<String, InvoiceItem> catalog;
   const _ItemEditSheet(
-      {required this.item,
+      {required this.catalog,
+      required this.item,
       required this.isNew,
       required this.pinPrice,
       required this.pinType});
@@ -64,6 +71,19 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// كتالوج تلقائي: عند كتابة كود سبق استخدامه نملأ النوع والسعر والمرجع إن كانت فارغة.
+  void _fromCatalog(String code) {
+    final hit = widget.catalog[code.trim()];
+    if (hit == null) return;
+    setState(() {
+      if (_type.text.isEmpty) _type.text = hit.description;
+      if (_ref.text.isEmpty) _ref.text = hit.refNumber;
+      if (_price.text.isEmpty && hit.unitPrice > 0) {
+        _price.text = plainNumber(hit.unitPrice);
+      }
+    });
   }
 
   void _submit(bool addNext) {
@@ -102,6 +122,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
             Expanded(
                 child: TextField(
                     controller: _code,
+                    onChanged: _fromCatalog,
                     decoration: const InputDecoration(labelText: 'كود الصنف'))),
             const SizedBox(width: 10),
             Expanded(

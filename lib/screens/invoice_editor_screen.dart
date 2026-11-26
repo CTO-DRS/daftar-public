@@ -31,6 +31,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   Invoice? _inv;
   bool _dirty = false;
   bool _headerOpen = true;
+  Map<String, InvoiceItem> _catalog = {};
 
   final _number = TextEditingController();
   final _party = TextEditingController();
@@ -65,6 +66,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     } else {
       inv = Invoice(kind: widget.newKind, number: await _db.nextNumber());
     }
+    _catalog = await _db.itemCatalog();
     _number.text = inv.number;
     _party.text = inv.party;
     _notes.text = inv.notes;
@@ -120,6 +122,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         isNew: isNew,
         pinPrice: _pinPrice,
         pinType: _pinType,
+        catalog: _catalog,
       );
       if (r == null || !mounted) return;
       setState(() {
@@ -454,6 +457,21 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   ),
                 ),
               ]),
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Wrap(spacing: 8, children: [
+                  for (final st in InvoiceStatus.values)
+                    ChoiceChip(
+                      label: Text(st.label),
+                      selected: inv.status == st,
+                      onSelected: (_) {
+                        setState(() => inv.status = st);
+                        _touch();
+                      },
+                    ),
+                ]),
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: _party,
