@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -9,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
+import '../services/dev_feed.dart';
 
 /// حساب من حسابات المطور: لون الهوية، الأيقونة الحقيقية، الرابط.
 class DevLink {
@@ -108,7 +110,9 @@ class DeveloperBackdrop extends StatelessWidget {
 }
 
 class DeveloperSection extends StatelessWidget {
-  const DeveloperSection({super.key});
+  /// لافتات جاهزة (للاختبار). null = تحميل من الشبكة مع بديل مدمج.
+  final List<DevBanner>? banners;
+  const DeveloperSection({super.key, this.banners});
 
   @override
   Widget build(BuildContext context) {
@@ -122,13 +126,236 @@ class DeveloperSection extends StatelessWidget {
         Expanded(child: Divider(height: 1, thickness: 1, color: Color(0x40A78BFA))),
       ]),
       const SizedBox(height: 14),
+      BannerCarousel(initial: banners),
+      const SizedBox(height: 14),
       const DeveloperCard(),
+      const SizedBox(height: 14),
+      const DeveloperActions(),
       const SizedBox(height: 18),
       const Center(
         child: Text('$appName • الإصدار $appVersionName',
             style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
       ),
     ]);
+  }
+}
+
+/// لافتة متحركة فوق البطاقة: تتبدل كل 5 ثوانٍ، والمحتوى من banners.json.
+class BannerCarousel extends StatefulWidget {
+  final List<DevBanner>? initial;
+  const BannerCarousel({super.key, this.initial});
+  @override
+  State<BannerCarousel> createState() => _BannerCarouselState();
+}
+
+class _BannerCarouselState extends State<BannerCarousel> {
+  late List<DevBanner> _items = widget.initial ?? defaultBanners;
+  final _ctl = PageController();
+  Timer? _timer;
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initial == null) {
+      loadBanners().then((v) {
+        if (mounted) setState(() => _items = v);
+      });
+    }
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || _items.length < 2 || !_ctl.hasClients) return;
+      _ctl.animateToPage((_page + 1) % _items.length,
+          duration: const Duration(milliseconds: 600), curve: Curves.easeInOutCubic);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = Localizations.localeOf(context).languageCode == 'ar';
+    return Column(children: [
+      SizedBox(
+        height: 122,
+        child: PageView.builder(
+          controller: _ctl,
+          itemCount: _items.length,
+          onPageChanged: (i) => setState(() => _page = i),
+          itemBuilder: (c, i) {
+            final b = _items[i];
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: b.url == null ? null : () => _openUrl(context, b.url!),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    gradient: LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [b.color.withValues(alpha: .85), b.color.withValues(alpha: .35)]),
+                    border: Border.all(color: const Color(0x40FFFFFF)),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33FFFFFF)),
+                      child: Icon(b.icon, color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(b.title(ar),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                        const SizedBox(height: 4),
+                        Text(b.body(ar),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, color: Color(0xDDFFFFFF))),
+                      ]),
+                    ),
+                    if (b.url != null) const Icon(Icons.chevron_left_rounded, color: Colors.white70),
+                  ]),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      if (_items.length > 1) ...[
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (var i = 0; i < _items.length; i++)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: i == _page ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                  color: i == _page ? const Color(0xFFA78BFA) : const Color(0x40FFFFFF),
+                  borderRadius: BorderRadius.circular(3)),
+            ),
+        ]),
+      ],
+    ]);
+  }
+}
+
+String appShareMessage() =>
+    'جرّب تطبيق «دفتر» للفواتير والمخزون: عربي ويعمل بدون إنترنت.\n'
+    'حمّله من هنا:\n$releasesPageUrl\n\n'
+    'Try Daftar, an Arabic offline invoice and inventory app:\n$releasesPageUrl';
+
+String allAccountsMessage() {
+  final b = StringBuffer('حسابات CTO.DRS • CTO.DRS accounts\n');
+  for (final l in developerLinks) {
+    b.writeln('${l.label}: ${l.url}');
+  }
+  return b.toString().trimRight();
+}
+
+/// أزرار النظام: شارك التطبيق، شارك كل الحسابات، التحقق من التحديثات.
+class DeveloperActions extends StatefulWidget {
+  const DeveloperActions({super.key});
+  @override
+  State<DeveloperActions> createState() => _DeveloperActionsState();
+}
+
+class _DeveloperActionsState extends State<DeveloperActions> {
+  bool _checking = false;
+
+  Future<void> _check() async {
+    setState(() => _checking = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final u = await checkForUpdate();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          backgroundColor: const Color(0xF20B0C24),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24), side: const BorderSide(color: Color(0x408E5BD0))),
+          title: Text(u.newer ? 'يتوفر إصدار جديد' : 'أنت على أحدث إصدار',
+              style: const TextStyle(color: Colors.white, fontSize: 18)),
+          content: Text(
+              u.newer
+                  ? 'الإصدار الحالي $appVersionName، والأحدث ${u.latest}.'
+                  : 'الإصدار $appVersionName هو الأحدث.\nYou are up to date.',
+              style: const TextStyle(color: Color(0xFFCBD5E1))),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('إغلاق')),
+            if (u.newer)
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: _violet, foregroundColor: Colors.white),
+                onPressed: () {
+                  Navigator.pop(c);
+                  _openUrl(context, u.url);
+                },
+                child: const Text('تنزيل التحديث'),
+              ),
+          ],
+        ),
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('تعذّر التحقق من التحديثات. تأكد من الاتصال بالإنترنت.')));
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0x14FFFFFF),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0x268E5BD0)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(
+              child: _GlassButton(
+                icon: Icons.ios_share,
+                label: 'شارك التطبيق',
+                onTap: () => SharePlus.instance.share(ShareParams(text: appShareMessage(), subject: appName)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _GlassButton(
+                icon: Icons.groups_2_rounded,
+                label: 'شارك الحسابات',
+                onTap: () => SharePlus.instance.share(ShareParams(text: allAccountsMessage(), subject: 'CTO.DRS')),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+                backgroundColor: _violet, foregroundColor: Colors.white, minimumSize: const Size(0, 46)),
+            onPressed: _checking ? null : _check,
+            icon: _checking
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.system_update_alt_rounded, size: 18),
+            label: const Text('التحقق من التحديثات  •  $appVersionName'),
+          ),
+        ]),
+      ),
+    );
   }
 }
 
@@ -474,7 +701,7 @@ class _GlassButton extends StatelessWidget {
             minimumSize: const Size(0, 44)),
         onPressed: onTap,
         icon: Icon(icon, size: 18),
-        label: Text(label, style: const TextStyle(fontSize: 13)),
+        label: Text(label, maxLines: 1, style: const TextStyle(fontSize: 12.5)),
       );
 }
 

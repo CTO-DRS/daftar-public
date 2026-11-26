@@ -1,0 +1,24 @@
+{
+  "banners": [
+    {
+      "id": "daftar-welcome",
+      "title_ar": "دفتر: فواتيرك ومخزونك في جيبك",
+      "title_en": "Daftar: invoices and stock in your pocket",
+      "body_ar": "تطبيق عربي يعمل بدون إنترنت. شاركه مع من يحتاجه.",
+      "body_en": "An Arabic, offline-first app. Share it with someone who needs it.",
+      "url": "https://github.com/CTO-DRS/daftar-public/releases/latest",
+      "color": "#0F766E",
+      "icon": "apps"
+    },
+    {
+      "id": "dev-services",
+      "title_ar": "تحتاج تطبيقاً أو استشارة تقنية؟",
+      "title_en": "Need an app or tech consulting?",
+      "body_ar": "تواصل مع المطوّر مباشرة عبر واتساب.",
+      "body_en": "Message the developer directly on WhatsApp.",
+      "url": "https://wa.me/message/MVTVWPOPFOVFF1",
+      "color": "#128C7E",
+      "icon": "support"
+    }
+  ]
+}

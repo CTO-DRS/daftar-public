@@ -4,7 +4,9 @@ import 'dart:ui' as ui;
 
 import 'package:daftar/main.dart' show buildTheme;
 import 'package:daftar/screens/about_screen.dart';
+import 'package:daftar/services/dev_feed.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
@@ -27,12 +29,12 @@ void main() {
           ..addFont(Future.value(ByteData.sublistView(File('assets/fonts/FABrands.otf').readAsBytesSync())));
         await fa.load();
       });
-      t.view.physicalSize = const Size(540, 820);
+      t.view.physicalSize = const Size(540, 1400);
       t.view.devicePixelRatio = 1.5;
       final key = GlobalKey();
       await t.pumpWidget(MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: buildTheme(b),
+        locale: const Locale('ar'), supportedLocales: const [Locale('ar')], localizationsDelegates: GlobalMaterialLocalizations.delegates, theme: buildTheme(b),
         home: Directionality(
             textDirection: TextDirection.rtl,
             child: RepaintBoundary(
@@ -40,7 +42,7 @@ void main() {
                 child: const Scaffold(
                     body: DeveloperBackdrop(
                         child: SafeArea(
-                            child: Padding(padding: EdgeInsets.all(16), child: DeveloperSection())))))),
+                            child: Padding(padding: EdgeInsets.all(16), child: DeveloperSection(banners: defaultBanners))))))),
       ));
       await t.runAsync(() async {
         await precacheImage(const AssetImage('assets/images/developer.jpg'),
