@@ -30,6 +30,7 @@ class BackupService {
       'items': await all('items'),
       'parties': await all('parties'),
       'recurring': await all('recurring'),
+      'price_tiers': await all('price_tiers'),
     };
     return const JsonEncoder.withIndent(' ').convert(data);
   }
@@ -72,11 +73,11 @@ class BackupService {
     final b = parse(text);
     final d = await AppDatabase.instance.db;
     await d.transaction((tx) async {
-      for (final t in ['recurring', 'items', 'invoices', 'parties']) {
+      for (final t in ['recurring', 'items', 'invoices', 'parties', 'price_tiers']) {
         await tx.delete(t);
       }
-      for (final t in ['parties', 'invoices', 'items', 'recurring']) {
-        for (final r in b[t] as List) {
+      for (final t in ['parties', 'invoices', 'items', 'recurring', 'price_tiers']) {
+        for (final r in (b[t] as List? ?? const [])) {
           await tx.insert(t, Map<String, Object?>.from(r as Map),
               conflictAlgorithm: ConflictAlgorithm.replace);
         }

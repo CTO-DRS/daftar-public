@@ -205,11 +205,13 @@ class PdfService {
     final anyRef = items.any((e) => e.refNumber.trim().isNotEmpty);
     final anyCode = items.any((e) => e.itemCode.trim().isNotEmpty);
     final anyNotes = items.any((e) => e.notes.trim().isNotEmpty);
-    String wq(InvoiceItem it) => !it.hasWholesale
-        ? ''
-        : (it.wholesaleUnit.trim().isEmpty
-            ? formatQty(it.wholesaleQty)
-            : '${formatQty(it.wholesaleQty)} ${it.wholesaleUnit.trim()}');
+    String wq(InvoiceItem it) {
+      if (!it.hasWholesale) return '';
+      final base = it.wholesaleUnit.trim().isEmpty
+          ? formatQty(it.wholesaleQty)
+          : '${formatQty(it.wholesaleQty)} ${it.wholesaleUnit.trim()}';
+      return it.packSize > 0 ? '$base (${formatQty(it.wholesaleQty * it.packSize)})' : base;
+    }
     // (العنوان، العرض، محاذاة لليمين؟، القيمة) من اليسار إلى اليمين (م أقصى اليمين).
     final cols = <(String, double, bool, String Function(InvoiceItem, int))>[
       if (anyNotes) ('ملاحظات', compact ? 1.8 : 2.0, true, (it, i) => it.notes),

@@ -12,6 +12,7 @@ class InvoiceItem {
   double wholesaleQty; // عدد الجملة (اختياري)
   double wholesalePrice; // سعر الجملة للوحدة الواحدة (اختياري)
   String wholesaleUnit; // وحدة الجملة: كرتون، درزن...
+  double packSize; // كم قطعة في وحدة الجملة (1 كرتون = 24 حبة)، 0 = غير محدد
 
   /// يُضبط عندما يكتشف التدقيق خللاً في الصف (مسح OCR).
   bool flagged;
@@ -32,6 +33,7 @@ class InvoiceItem {
     this.wholesaleQty = 0,
     this.wholesalePrice = 0,
     this.wholesaleUnit = '',
+    this.packSize = 0,
     this.flagged = false,
     this.statedTotal,
   });
@@ -39,6 +41,9 @@ class InvoiceItem {
   /// الإجمالي = العدد × سعر الفردي.
   /// إجمالي الجملة = عدد الجملة × سعر الجملة.
   double get wholesaleTotal => wholesaleQty * wholesalePrice;
+
+  /// إجمالي القطع: الفردي + (عدد الجملة × حجم العبوة) عند تحديد حجم العبوة.
+  double get pieces => quantity + (packSize > 0 ? wholesaleQty * packSize : 0);
 
   bool get hasWholesale => wholesaleQty != 0 || wholesalePrice != 0;
 
@@ -68,6 +73,7 @@ class InvoiceItem {
         wholesaleQty: wholesaleQty,
         wholesalePrice: wholesalePrice,
         wholesaleUnit: wholesaleUnit,
+        packSize: packSize,
         flagged: flagged,
         statedTotal: statedTotal,
       );
@@ -86,6 +92,7 @@ class InvoiceItem {
         'wholesale_qty': wholesaleQty,
         'wholesale_price': wholesalePrice,
         'wholesale_unit': wholesaleUnit,
+        'pack_size': packSize,
       };
 
   factory InvoiceItem.fromMap(Map<String, Object?> m) => InvoiceItem(
@@ -101,5 +108,6 @@ class InvoiceItem {
         wholesaleQty: (m['wholesale_qty'] as num?)?.toDouble() ?? 0,
         wholesalePrice: (m['wholesale_price'] as num?)?.toDouble() ?? 0,
         wholesaleUnit: (m['wholesale_unit'] as String?) ?? '',
+        packSize: (m['pack_size'] as num?)?.toDouble() ?? 0,
       );
 }

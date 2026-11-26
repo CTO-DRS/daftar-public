@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../database/app_database.dart';
 import '../models/invoice_item.dart';
+import '../utils/pricing.dart';
 import '../utils/number_utils.dart';
 
 class ItemEditResult {
@@ -65,7 +67,61 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
   late final _wPrice = TextEditingController(
       text: widget.item.wholesalePrice == 0 ? '' : plainNumber(widget.item.wholesalePrice));
   late final _wUnit = TextEditingController(text: widget.item.wholesaleUnit);
-  late bool _showWholesale = widget.item.hasWholesale;
+  late final _pack = TextEditingController(
+      text: widget.item.packSize == 0 ? '' : plainNumber(widget.item.packSize));
+  late bool _showWholesale = widget.item.hasWholesale || widget.item.packSize > 0;
+  List<PriceTier> _tiers = [];
+  bool _tiersDirty = false;
+  bool _showTiers = false;
+  final _tMin = TextEditingController();
+  final _tPrice = TextEditingController();
+  String? _tierNote;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTiers();
+  }
+
+  String get _key => tierKey(_code.text, _type.text);
+
+  Future<void> _loadTiers() async {
+    try {
+      final t = await AppDatabase.instance.tiersFor(_key);
+      if (mounted && !_tiersDirty) {
+        setState(() {
+          _tiers = t;
+          if (t.isNotEmpty) _showTiers = true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  /// يطبّق شريحة السعر المناسبة للكمية الحالية.
+  void _applyTier() {
+    final q = parseNumber(_qty.text) ?? 0;
+    final p = tierPrice(_tiers, q);
+    if (p != null && q > 0) {
+      _price.text = plainNumber(p);
+      _tierNote = 'شريحة الكمية: ${formatMoney(p)} للوحدة';
+    } else {
+      _tierNote = null;
+    }
+  }
+
+  void _addTier() {
+    final m = parseNumber(_tMin.text) ?? 0;
+    final pr = parseNumber(_tPrice.text) ?? 0;
+    if (m <= 0 || pr <= 0) return;
+    setState(() {
+      _tiers = [..._tiers.where((t) => t.minQty != m), PriceTier(m, pr)]
+        ..sort((a, b) => a.minQty.compareTo(b.minQty));
+      _tiersDirty = true;
+      _tMin.clear();
+      _tPrice.clear();
+      _applyTier();
+    });
+  }
   static const _unitPresets = [
     'عدد', 'حبة', 'درزن', 'كرتون', 'علبة', 'باكت', 'كيس', 'صندوق', 'رزمة', 'حزمة', 'لفة', 'طقم',
     'زجاجة', 'قارورة', 'برميل', 'جالون', 'كجم', 'جم', 'طن', 'رطل', 'أونصة', 'لتر', 'مل',
@@ -80,7 +136,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
 
   @override
   void dispose() {
-    for (final c in [_code, _ref, _type, _qty, _price, _notes, _unit, _wQty, _wPrice, _wUnit]) {
+    for (final c in [_code, _ref, _type, _qty, _price, _notes, _unit, _wQty, _wPrice, _wUnit, _pack, _tMin, _tPrice]) {
       c.dispose();
     }
     super.dispose();
@@ -111,7 +167,11 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       ..wholesaleQty = parseNumber(_wQty.text) ?? 0
       ..wholesalePrice = parseNumber(_wPrice.text) ?? 0
       ..wholesaleUnit = _wUnit.text.trim()
+      ..packSize = parseNumber(_pack.text) ?? 0
       ..flagged = false;
+    if (_tiersDirty) {
+      AppDatabase.instance.saveTiers(_key, _tiers);
+    }
     Navigator.pop(context, ItemEditResult(it, addNext, _pinPrice, _pinType));
   }
 
@@ -139,7 +199,10 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
             Expanded(
                 child: TextField(
                     controller: _code,
-                    onChanged: _fromCatalog,
+                    onChanged: (v) {
+                      _fromCatalog(v);
+                      _loadTiers();
+                    },
                     decoration: const InputDecoration(labelText: 'كود الصنف'))),
             const SizedBox(width: 10),
             Expanded(
@@ -153,6 +216,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
             Expanded(
                 child: TextField(
                     controller: _type,
+                    onChanged: (_) => _loadTiers(),
                     decoration:
                         const InputDecoration(labelText: 'النوع / الوصف'))),
             _pin(_pinType, () => setState(() => _pinType = !_pinType),
@@ -165,7 +229,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                     controller: _qty,
                     keyboardType: numKb,
                     autofocus: widget.isNew,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) => setState(_applyTier),
                     decoration: const InputDecoration(labelText: 'العدد'))),
             const SizedBox(width: 10),
             Expanded(
@@ -235,6 +299,82 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                   onSelected: (on) => setState(() => _wUnit.text = on ? u : ''),
                 ),
             ]),
+            const SizedBox(height: 10),
+            TextField(
+                controller: _pack,
+                keyboardType: numKb,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                    labelText: 'حجم العبوة (كم قطعة في وحدة الجملة)',
+                    hintText: 'مثال: 24',
+                    helperText: (parseNumber(_pack.text) ?? 0) > 0 && (parseNumber(_wQty.text) ?? 0) > 0
+                        ? '${formatQty(parseNumber(_wQty.text)!)} ${_wUnit.text.trim()} = ${formatQty(parseNumber(_wQty.text)! * parseNumber(_pack.text)!)} قطعة'
+                        : null)),
+            if ((parseNumber(_pack.text) ?? 0) > 0)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Wrap(spacing: 8, children: [
+                  if ((parseNumber(_price.text) ?? 0) > 0)
+                    ActionChip(
+                      avatar: const Icon(Icons.calculate_outlined, size: 16),
+                      label: const Text('سعر الجملة = الفردي × العبوة'),
+                      onPressed: () => setState(() => _wPrice.text =
+                          plainNumber((parseNumber(_price.text)! * parseNumber(_pack.text)!))),
+                    ),
+                  if ((parseNumber(_wPrice.text) ?? 0) > 0)
+                    ActionChip(
+                      avatar: const Icon(Icons.calculate_outlined, size: 16),
+                      label: const Text('الفردي = سعر الجملة ÷ العبوة'),
+                      onPressed: () => setState(() => _price.text =
+                          plainNumber((parseNumber(_wPrice.text)! / parseNumber(_pack.text)!))),
+                    ),
+                ]),
+              ),
+          ],
+          const SizedBox(height: 4),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _showTiers = !_showTiers),
+              icon: Icon(_showTiers ? Icons.expand_less : Icons.stacked_bar_chart, size: 18),
+              label: Text(_showTiers ? 'إخفاء شرائح السعر' : 'شرائح السعر حسب الكمية'),
+            ),
+          ),
+          if (_showTiers) ...[
+            for (final t in _tiers)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.arrow_circle_down_outlined),
+                title: Text('من ${formatQty(t.minQty)} فأكثر: ${formatMoney(t.price)} للوحدة'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => setState(() {
+                    _tiers = _tiers.where((e) => e != t).toList();
+                    _tiersDirty = true;
+                    _applyTier();
+                  }),
+                ),
+              ),
+            Row(children: [
+              Expanded(
+                  child: TextField(
+                      controller: _tMin,
+                      keyboardType: numKb,
+                      decoration: const InputDecoration(labelText: 'من كمية'))),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: TextField(
+                      controller: _tPrice,
+                      keyboardType: numKb,
+                      decoration: const InputDecoration(labelText: 'السعر للوحدة'))),
+              IconButton.filledTonal(onPressed: _addTier, icon: const Icon(Icons.add)),
+            ]),
+            if (_tierNote != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(_tierNote!, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12)),
+              ),
           ],
           const SizedBox(height: 10),
           TextField(

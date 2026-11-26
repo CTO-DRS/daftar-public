@@ -5,6 +5,7 @@ import 'package:daftar/models/invoice.dart';
 import 'package:daftar/models/invoice_item.dart';
 import 'package:daftar/models/party.dart';
 import 'package:daftar/services/backup_service.dart';
+import 'package:daftar/utils/pricing.dart';
 import 'package:daftar/services/settings_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,7 +25,10 @@ void main() {
         number: '0001', party: 'نور', vatRate: 15, date: DateTime(2026, 8, 1),
         status: InvoiceStatus.confirmed, paidAmount: 50,
         items: [InvoiceItem(description: 'مفتاح', quantity: 2, unitPrice: 100, unit: 'درزن')]));
+    await db.saveTiers('c:a1', [const PriceTier(10, 9), const PriceTier(50, 8)]);
     final json = await BackupService.exportJson();
+    await db.saveTiers('c:a1', []);
+    expect(await db.tiersFor('c:a1'), isEmpty);
     // غيّر البيانات بعد النسخ.
     await db.deleteInvoice(id);
     await db.saveInvoice(Invoice(number: '0099', party: 'آخر', items: [InvoiceItem(description: 'x', quantity: 1, unitPrice: 1)]));
@@ -39,6 +43,9 @@ void main() {
     expect(inv!.items.single.unit, 'درزن');
     expect(inv.paidAmount, 50);
     expect((await db.listParties()).single.party.phone, '0555');
+    final tiers = await db.tiersFor('c:a1');
+    expect(tiers.length, 2);
+    expect(tiers.last.price, 8);
   });
 
   test('rejects bad files without touching data', () {

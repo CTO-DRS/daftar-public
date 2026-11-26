@@ -84,7 +84,7 @@ class ItemTile extends StatelessWidget {
                   ),
                   if (item.hasWholesale)
                     Text(
-                      'جملة: ${formatQty(item.wholesaleQty)}${item.wholesaleUnit.trim().isEmpty ? '' : ' ${item.wholesaleUnit.trim()}'} × ${formatMoney(item.wholesalePrice)}',
+                      'جملة: ${formatQty(item.wholesaleQty)}${item.wholesaleUnit.trim().isEmpty ? '' : ' ${item.wholesaleUnit.trim()}'} × ${formatMoney(item.wholesalePrice)}${item.packSize > 0 ? ' (= ${formatQty(item.wholesaleQty * item.packSize)} قطعة)' : ''}',
                       style: TextStyle(color: cs.primary, fontSize: 13),
                     ),
                   if (item.notes.isNotEmpty)

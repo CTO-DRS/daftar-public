@@ -70,7 +70,7 @@ class Invoice {
   int get itemCount => items.where((e) => !e.isEmpty).length;
 
   /// إجمالي القطع.
-  double get totalQuantity => items.fold(0.0, (s, i) => s + i.quantity);
+  double get totalQuantity => items.fold(0.0, (s, i) => s + i.pieces);
 
   /// المبلغ الإجمالي النهائي.
   double get subtotal => items.fold(0.0, (s, i) => s + i.total);

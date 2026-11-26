@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
 import '../utils/insights.dart';
+import '../utils/pricing.dart';
 import '../utils/recurrence.dart';
 import '../models/invoice_item.dart';
 import '../models/party.dart';
@@ -26,6 +27,14 @@ class AppDatabase {
       phone TEXT NOT NULL DEFAULT '',
       address TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT ''
+    )''';
+
+  static const _tiersDdl = '''
+    CREATE TABLE IF NOT EXISTS price_tiers(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_key TEXT NOT NULL,
+      min_qty REAL NOT NULL,
+      price REAL NOT NULL
     )''';
 
   static const _recurringDdl = '''
@@ -53,7 +62,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 9,
+      version: 10,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -80,6 +89,10 @@ class AppDatabase {
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_qty REAL NOT NULL DEFAULT 0');
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
           await d.execute("ALTER TABLE items ADD COLUMN wholesale_unit TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 10) {
+          await d.execute('ALTER TABLE items ADD COLUMN pack_size REAL NOT NULL DEFAULT 0');
+          await d.execute(_tiersDdl);
         }
         if (o < 7) {
           await d.execute(_recurringDdl);
@@ -123,14 +136,38 @@ class AppDatabase {
             unit TEXT NOT NULL DEFAULT '',
             wholesale_qty REAL NOT NULL DEFAULT 0,
             wholesale_price REAL NOT NULL DEFAULT 0,
-            wholesale_unit TEXT NOT NULL DEFAULT ''
+            wholesale_unit TEXT NOT NULL DEFAULT '',
+            pack_size REAL NOT NULL DEFAULT 0
           )''');
+        await d.execute(_tiersDdl);
         await d.execute(_partiesDdl);
         await d.execute(_recurringDdl);
         await d.execute('CREATE INDEX idx_items_invoice ON items(invoice_id, position)');
       },
       ),
     );
+  }
+
+  /// شرائح أسعار صنف (حسب الكمية)، مرتبة بالكمية.
+  Future<List<PriceTier>> tiersFor(String key) async {
+    final d = await db;
+    final r = await d.query('price_tiers', where: 'item_key = ?', whereArgs: [key], orderBy: 'min_qty');
+    return r
+        .map((m) => PriceTier((m['min_qty'] as num).toDouble(), (m['price'] as num).toDouble()))
+        .toList();
+  }
+
+  /// يستبدل شرائح الصنف بالقائمة الجديدة (قائمة فارغة = حذف الشرائح).
+  Future<void> saveTiers(String key, List<PriceTier> tiers) async {
+    final d = await db;
+    await d.transaction((tx) async {
+      await tx.delete('price_tiers', where: 'item_key = ?', whereArgs: [key]);
+      for (final t in tiers) {
+        if (t.minQty > 0 && t.price > 0) {
+          await tx.insert('price_tiers', {'item_key': key, 'min_qty': t.minQty, 'price': t.price});
+        }
+      }
+    });
   }
 
   /// مبيعات الأصناف (حسب الوصف) من الفواتير المعتمدة فقط، الأعلى إيراداً أولاً.
