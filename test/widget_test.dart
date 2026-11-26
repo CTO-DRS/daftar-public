@@ -43,9 +43,9 @@ void main() {
 void digitTests() {
   test('Arabic-Indic digit display option', () {
     useArabicDigits = true;
-    expect(formatMoney(1250.5), '١٬٢٥٠٫٥');
+    expect(formatMoney(1250.5), '١٬٢٥٠٫٥٠');
     useArabicDigits = false;
-    expect(formatMoney(1250.5), '1,250.5');
+    expect(formatMoney(1250.5), '1,250.50');
   });
 }
 

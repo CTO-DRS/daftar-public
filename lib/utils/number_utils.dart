@@ -44,7 +44,7 @@ double? parseNumber(String? input) {
   return double.tryParse(s);
 }
 
-final NumberFormat _money = NumberFormat('#,##0.##', 'en');
+final NumberFormat _money = NumberFormat('#,##0.00', 'en');
 final NumberFormat _qty = NumberFormat('#,##0.###', 'en');
 
 /// خيار عرض الأرقام بالهندية (٠١٢٣) بدل اللاتينية. يُضبط من الإعدادات.
