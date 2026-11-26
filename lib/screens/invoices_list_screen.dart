@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import '../utils/reminder.dart';
 
 import '../database/app_database.dart';
 import '../models/invoice.dart';
@@ -24,6 +27,27 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
   final _search = TextEditingController();
   List<InvoiceSummary> _items = [];
   bool _loading = true;
+
+  Future<void> _remind(InvoiceSummary s) async {
+    final inv = s.invoice;
+    final party = await AppDatabase.instance.partyByName(inv.party);
+    final rem = paymentRemaining(s.grandTotal, inv.paidAmount, inv.status);
+    final text = reminderText(
+      party: inv.party.isEmpty ? 'عميلنا الكريم' : inv.party,
+      number: localizeDigits(inv.number),
+      remaining: rem,
+      currency: inv.currency,
+      dueDate: inv.dueDate,
+      now: DateTime.now(),
+      company: SettingsService.instance.companyName,
+    );
+    final phone = waPhone(party?.phone ?? '');
+    if (!mounted) return;
+    final ok = await launchUrl(waUri(phone, text),
+            mode: LaunchMode.externalApplication)
+        .catchError((_) => false);
+    if (!ok) await Share.share(text);
+  }
 
   @override
   void initState() {
@@ -223,16 +247,25 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                         onSelected: (v) async {
                                           if (v == 'del') {
                                             _delete(s);
+                                          } else if (v == 'remind') {
+                                            _remind(s);
                                           } else if (v == 'dup') {
                                             await AppDatabase.instance
                                                 .duplicateInvoice(inv.id!);
                                             _load();
                                           }
                                         },
-                                        itemBuilder: (_) => const [
-                                          PopupMenuItem(
+                                        itemBuilder: (_) => [
+                                          if (inv.kind == DocKind.invoice &&
+                                              paymentRemaining(s.grandTotal,
+                                                      inv.paidAmount, inv.status) >
+                                                  0.005)
+                                            const PopupMenuItem(
+                                                value: 'remind',
+                                                child: Text('تذكير بالسداد (واتساب)')),
+                                          const PopupMenuItem(
                                               value: 'dup', child: Text('نسخ')),
-                                          PopupMenuItem(
+                                          const PopupMenuItem(
                                               value: 'del', child: Text('حذف')),
                                         ],
                                       ),
