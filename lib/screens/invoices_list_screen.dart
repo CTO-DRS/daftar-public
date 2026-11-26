@@ -13,6 +13,7 @@ import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
+import 'insights_screen.dart';
 import 'recurring_screen.dart';
 import '../utils/recurrence.dart';
 import '../utils/dashboard.dart';
@@ -180,6 +181,12 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       appBar: AppBar(
         title: const Text('دفتر'),
         actions: [
+          IconButton(
+            tooltip: 'الذكاء المالي',
+            icon: const Icon(Icons.psychology_outlined),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const InsightsScreen())),
+          ),
           IconButton(
             tooltip: 'الفواتير الدورية',
             icon: const Icon(Icons.autorenew),

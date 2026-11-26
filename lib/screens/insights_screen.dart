@@ -1,0 +1,302 @@
+import 'package:flutter/material.dart';
+
+import '../database/app_database.dart';
+import '../services/settings_service.dart';
+import '../utils/insights.dart';
+import '../utils/number_utils.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/responsive.dart';
+
+/// الذكاء المالي: تنبيهات ذكية، توقع التحصيل، أعمار الديون، تصنيف العملاء، أفضل الأصناف.
+/// كل التحليل يتم على الجهاز بدون إنترنت.
+class InsightsScreen extends StatefulWidget {
+  final InsightsReport? preloaded;
+  const InsightsScreen({super.key, this.preloaded});
+  @override
+  State<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends State<InsightsScreen> {
+  InsightsReport? _r;
+
+  @override
+  void initState() {
+    super.initState();
+    _r = widget.preloaded;
+    if (_r == null) _load();
+  }
+
+  Future<void> _load() async {
+    final cur = SettingsService.instance.currency;
+    final all = await AppDatabase.instance.listInvoices();
+    final prods = await AppDatabase.instance.topProducts(currency: cur);
+    final r = computeInsights(all, DateTime.now(), currency: cur, products: prods);
+    if (mounted) setState(() => _r = r);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _r;
+    return Scaffold(
+      appBar: AppBar(title: const Text('الذكاء المالي')),
+      body: r == null
+          ? const Center(child: CircularProgressIndicator())
+          : r.isEmpty
+              ? const EmptyState(
+                  badge: Icons.psychology_outlined,
+                  title: 'لا توجد بيانات كافية بعد',
+                  hint: 'أنشئ واعتمد بعض الفواتير وسيحلّلها دفتر لك هنا: تنبيهات، توقع تحصيل، وتصنيف عملاء.')
+              : ContentWidth(
+                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+                  _Alerts(r.alerts),
+                  _Section('توقع التحصيل', Icons.event_available_outlined),
+                  _ForecastGrid(r.forecast),
+                  _Section('أعمار الديون', Icons.timelapse),
+                  _AgingBar(r.aging),
+                  if (r.customers.isNotEmpty) ...[
+                    _Section('العملاء ومخاطر السداد', Icons.groups_2_outlined),
+                    for (final c in r.customers.take(8)) _CustomerTile(c),
+                  ],
+                  if (r.products.isNotEmpty) ...[
+                    _Section('أفضل الأصناف إيراداً', Icons.workspace_premium_outlined),
+                    _Products(r.products),
+                  ],
+                  const SizedBox(height: 12),
+                  Text('التحليل تقديري ويعتمد على بياناتك المسجلة. لا يُحتسب إلا الفواتير المعتمدة بعملة ${SettingsService.instance.currency}.',
+                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.outline)),
+                ])),
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const _Section(this.title, this.icon);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 20, bottom: 10),
+        child: Row(children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        ]),
+      );
+}
+
+Color _levelColor(InsightLevel l) => switch (l) {
+      InsightLevel.good => const Color(0xFF12B886),
+      InsightLevel.info => const Color(0xFF3B82F6),
+      InsightLevel.warn => const Color(0xFFF59E0B),
+      InsightLevel.risk => const Color(0xFFEF4444),
+    };
+
+IconData _levelIcon(InsightLevel l) => switch (l) {
+      InsightLevel.good => Icons.trending_up,
+      InsightLevel.info => Icons.info_outline,
+      InsightLevel.warn => Icons.warning_amber_rounded,
+      InsightLevel.risk => Icons.error_outline,
+    };
+
+class _Alerts extends StatelessWidget {
+  final List<Insight> items;
+  const _Alerts(this.items);
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _Tint(
+          color: Color(0xFF12B886),
+          child: Row(children: [
+            Icon(Icons.verified_outlined, color: Color(0xFF12B886)),
+            SizedBox(width: 10),
+            Expanded(child: Text('كل شيء على ما يرام: لا متأخرات ولا مخاطر ظاهرة الآن.')),
+          ]));
+    }
+    return Column(children: [
+      for (final a in items)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _Tint(
+              color: _levelColor(a.level),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(_levelIcon(a.level), color: _levelColor(a.level)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(a.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(a.body, style: const TextStyle(fontSize: 13)),
+                ])),
+              ])),
+        ),
+    ]);
+  }
+}
+
+class _Tint extends StatelessWidget {
+  final Color color;
+  final Widget child;
+  const _Tint({required this.color, required this.child});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: .35)),
+        ),
+        child: child,
+      );
+}
+
+class _ForecastGrid extends StatelessWidget {
+  final Forecast f;
+  const _ForecastGrid(this.f);
+  @override
+  Widget build(BuildContext context) {
+    final cur = SettingsService.instance.currency;
+    Widget tile(String label, double v, Color c) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardTheme.color,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: c.withValues(alpha: .5)),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label, style: TextStyle(fontSize: 12, color: c, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Text(formatMoney(v), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              Text(cur, style: const TextStyle(fontSize: 11)),
+            ]),
+          ),
+        );
+    return Column(children: [
+      Row(children: [
+        tile('متأخر (حصّله الآن)', f.overdue, const Color(0xFFEF4444)),
+        const SizedBox(width: 10),
+        tile('خلال 7 أيام', f.next7, const Color(0xFF12B886)),
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        tile('8 إلى 30 يوماً', f.next30, const Color(0xFF3B82F6)),
+        const SizedBox(width: 10),
+        tile('لاحقاً / بلا استحقاق', f.later, const Color(0xFF64748B)),
+      ]),
+    ]);
+  }
+}
+
+class _AgingBar extends StatelessWidget {
+  final Aging a;
+  const _AgingBar(this.a);
+  @override
+  Widget build(BuildContext context) {
+    final parts = <(String, double, Color)>[
+      ('لم يستحق', a.notDue, const Color(0xFF12B886)),
+      ('1-30 يوماً', a.d30, const Color(0xFFF59E0B)),
+      ('31-60', a.d60, const Color(0xFFF97316)),
+      ('61-90', a.d90, const Color(0xFFEF4444)),
+      ('+90', a.d90plus, const Color(0xFF991B1B)),
+    ];
+    if (a.total <= 0.005) {
+      return const Text('لا ديون مفتوحة.');
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 14,
+          child: Row(children: [
+            for (final p in parts)
+              if (p.$2 > 0.005) Expanded(flex: (p.$2 / a.total * 1000).round().clamp(1, 1000), child: Container(color: p.$3)),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Wrap(spacing: 14, runSpacing: 6, children: [
+        for (final p in parts)
+          if (p.$2 > 0.005)
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 10, height: 10, decoration: BoxDecoration(color: p.$3, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text('${p.$1}: ${formatMoney(p.$2)}', style: const TextStyle(fontSize: 12)),
+            ]),
+      ]),
+    ]);
+  }
+}
+
+class _CustomerTile extends StatelessWidget {
+  final CustomerInsight c;
+  const _CustomerTile(this.c);
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (c.risk) {
+      Risk.low => ('منتظم', const Color(0xFF12B886)),
+      Risk.medium => ('متأخر', const Color(0xFFF59E0B)),
+      Risk.high => ('خطر', const Color(0xFFEF4444)),
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .5)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(color: color.withValues(alpha: .15), borderRadius: BorderRadius.circular(20)),
+            child: Text(label, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w700)),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(value: c.share.clamp(0, 1).toDouble(), minHeight: 6, color: color, backgroundColor: color.withValues(alpha: .12)),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'مبيعات ${formatMoney(c.sales)} (${localizeDigits((c.share * 100).round().toString())}٪)'
+          '${c.outstanding > 0.005 ? ' • مستحق ${formatMoney(c.outstanding)}' : ''}'
+          '${c.maxDaysLate > 0 ? ' • أقدم تأخير ${localizeDigits('${c.maxDaysLate}')} يوماً' : ''}',
+          style: const TextStyle(fontSize: 12),
+        ),
+      ]),
+    );
+  }
+}
+
+class _Products extends StatelessWidget {
+  final List<ProductSales> items;
+  const _Products(this.items);
+  @override
+  Widget build(BuildContext context) {
+    final max = items.first.revenue;
+    final cs = Theme.of(context).colorScheme;
+    return Column(children: [
+      for (var i = 0; i < items.length; i++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text('${localizeDigits('${i + 1}')}. ', style: TextStyle(color: cs.primary, fontWeight: FontWeight.w800)),
+              Expanded(child: Text(items[i].name, overflow: TextOverflow.ellipsis)),
+              Text(formatMoney(items[i].revenue), style: const TextStyle(fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(value: items[i].revenue / max, minHeight: 6, color: cs.primary, backgroundColor: cs.primary.withValues(alpha: .12)),
+            ),
+            Text('الكمية ${formatQty(items[i].qty)}', style: TextStyle(fontSize: 11, color: cs.outline)),
+          ]),
+        ),
+    ]);
+  }
+}

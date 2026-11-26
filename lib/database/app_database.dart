@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
+import '../utils/insights.dart';
 import '../utils/recurrence.dart';
 import '../models/invoice_item.dart';
 import '../models/party.dart';
@@ -122,6 +123,27 @@ class AppDatabase {
       },
       ),
     );
+  }
+
+  /// مبيعات الأصناف (حسب الوصف) من الفواتير المعتمدة فقط، الأعلى إيراداً أولاً.
+  /// الإشعار الدائن يطرح والمدين يضيف.
+  Future<List<ProductSales>> topProducts({int limit = 5, String currency = ''}) async {
+    final d = await db;
+    final rows = await d.rawQuery('''
+      SELECT TRIM(i.description) AS name,
+             SUM(CASE WHEN v.note_type = 'credit' THEN -i.quantity ELSE i.quantity END) AS qty,
+             SUM(CASE WHEN v.note_type = 'credit' THEN -1 ELSE 1 END * i.quantity * i.unit_price) AS revenue
+      FROM items i JOIN invoices v ON v.id = i.invoice_id
+      WHERE v.kind = 'invoice' AND v.status != 'draft' AND TRIM(i.description) != ''
+        AND (? = '' OR v.currency = '' OR v.currency = ?)
+      GROUP BY LOWER(TRIM(i.description))
+      HAVING revenue > 0
+      ORDER BY revenue DESC LIMIT ?
+    ''', [currency, currency, limit]);
+    return rows
+        .map((m) => ProductSales((m['name'] as String?) ?? '',
+            (m['qty'] as num?)?.toDouble() ?? 0, (m['revenue'] as num?)?.toDouble() ?? 0))
+        .toList();
   }
 
   /// قائمة الفواتير مع إمكانية البحث بالرقم أو اسم العميل.
