@@ -80,6 +80,9 @@ class SettingsService {
   int get numberPadding => _p.getInt('num_padding') ?? 1;
   set numberPadding(int v) => _p.setInt('num_padding', v.clamp(1, 8));
 
+  bool get appLock => _p.getBool('app_lock') ?? false;
+  set appLock(bool v) => _p.setBool('app_lock', v);
+
   bool get arabicDigits => _p.getBool('arabic_digits') ?? false;
   set arabicDigits(bool v) => _p.setBool('arabic_digits', v);
 

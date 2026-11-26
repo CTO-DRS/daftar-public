@@ -37,6 +37,16 @@ class AppDatabase {
       price REAL NOT NULL
     )''';
 
+  static const _auditDdl = '''
+    CREATE TABLE IF NOT EXISTS audit_log(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      doc_id INTEGER,
+      doc_number TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT ''
+    )''';
+
   static const _recurringDdl = '''
     CREATE TABLE IF NOT EXISTS recurring(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +72,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 10,
+      version: 11,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -89,6 +99,9 @@ class AppDatabase {
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_qty REAL NOT NULL DEFAULT 0');
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
           await d.execute("ALTER TABLE items ADD COLUMN wholesale_unit TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 11) {
+          await d.execute(_auditDdl);
         }
         if (o < 10) {
           await d.execute('ALTER TABLE items ADD COLUMN pack_size REAL NOT NULL DEFAULT 0');
@@ -140,6 +153,7 @@ class AppDatabase {
             pack_size REAL NOT NULL DEFAULT 0
           )''');
         await d.execute(_tiersDdl);
+        await d.execute(_auditDdl);
         await d.execute(_partiesDdl);
         await d.execute(_recurringDdl);
         await d.execute('CREATE INDEX idx_items_invoice ON items(invoice_id, position)');
@@ -225,7 +239,18 @@ class AppDatabase {
     final d = await db;
     inv.updatedAt = DateTime.now();
     inv.items.removeWhere((e) => e.isEmpty);
-    return d.transaction((txn) async {
+    String? before;
+    if (inv.id != null) {
+      final r = await d.query('invoices',
+          columns: ['grand_total', 'status', 'party'],
+          where: 'id = ?',
+          whereArgs: [inv.id]);
+      if (r.isNotEmpty) {
+        before =
+            '${(r.first['grand_total'] as num?)?.toStringAsFixed(2)}|${r.first['status']}|${r.first['party']}';
+      }
+    }
+    final newId = await d.transaction((txn) async {
       int id;
       final map = inv.toMap()..remove('id');
       if (inv.id == null) {
@@ -247,11 +272,54 @@ class AppDatabase {
       inv.id = id;
       return id;
     });
+    final after =
+        '${inv.grandTotal.toStringAsFixed(2)}|${inv.status.name}|${inv.party}';
+    if (before == null) {
+      await logAudit('create', newId, inv.number,
+          'الإجمالي ${inv.grandTotal.toStringAsFixed(2)} • ${inv.party}');
+    } else if (before != after) {
+      final b = before.split('|');
+      final parts = <String>[];
+      if (b[0] != inv.grandTotal.toStringAsFixed(2)) {
+        parts.add('الإجمالي ${b[0]} ← ${inv.grandTotal.toStringAsFixed(2)}');
+      }
+      if (b[1] != inv.status.name) {
+        parts.add('الحالة ${b[1]} ← ${inv.status.name}');
+      }
+      if (b.length > 2 && b.sublist(2).join('|') != inv.party) {
+        parts.add('العميل ${b.sublist(2).join('|')} ← ${inv.party}');
+      }
+      await logAudit('edit', newId, inv.number, parts.join(' • '));
+    }
+    return newId;
+  }
+
+  Future<void> logAudit(String action, int? docId, String number,
+      [String detail = '']) async {
+    final d = await db;
+    await d.insert('audit_log', {
+      'ts': DateTime.now().millisecondsSinceEpoch,
+      'action': action,
+      'doc_id': docId,
+      'doc_number': number,
+      'detail': detail,
+    });
+  }
+
+  Future<List<Map<String, Object?>>> auditEntries({int limit = 300}) async {
+    final d = await db;
+    return d.query('audit_log', orderBy: 'id DESC', limit: limit);
   }
 
   Future<void> deleteInvoice(int id) async {
     final d = await db;
+    final r = await d.query('invoices',
+        columns: ['number', 'grand_total'], where: 'id = ?', whereArgs: [id]);
     await d.delete('invoices', where: 'id = ?', whereArgs: [id]);
+    if (r.isNotEmpty) {
+      await logAudit('delete', id, (r.first['number'] as String?) ?? '',
+          'الإجمالي ${(r.first['grand_total'] as num?)?.toStringAsFixed(2)}');
+    }
   }
 
   /// نسخ فاتورة كاملة برقم جديد.

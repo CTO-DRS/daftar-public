@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
+import 'widgets/app_lock.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'screens/invoices_list_screen.dart';
@@ -102,7 +103,7 @@ class DaftarApp extends StatelessWidget {
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: mode,
-        home: const InvoicesListScreen(),
+        home: const AppLock(child: InvoicesListScreen()),
       ),
     );
   }

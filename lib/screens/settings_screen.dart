@@ -19,6 +19,8 @@ import '../services/settings_service.dart';
 import '../utils/number_utils.dart';
 import '../utils/platform_utils.dart';
 import '../widgets/responsive.dart';
+import '../widgets/app_lock.dart';
+import 'audit_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -28,6 +30,14 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final s = SettingsService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    AppLock.supported().then((v) {
+      if (mounted) setState(() => _lockSupported = v);
+    });
+  }
   late final _key = TextEditingController(text: s.apiKey);
   late final _company = TextEditingController(text: s.companyName);
   late final _currency = TextEditingController(text: s.currency);
@@ -42,6 +52,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late OcrProvider _provider = s.provider;
   bool _hide = true;
   bool _arabicDigits = SettingsService.instance.arabicDigits;
+  bool _appLock = SettingsService.instance.appLock;
+  bool _lockSupported = false;
 
   void _save() {
     s.apiKey = _key.text;
@@ -58,6 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     s.numberPadding = parseNumber(_pad.text)?.toInt() ?? 1;
     s.provider = _provider;
     s.arabicDigits = _arabicDigits;
+    s.appLock = _appLock;
     useArabicDigits = _arabicDigits;
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('تم حفظ الإعدادات')));
@@ -332,6 +345,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: const Text('يؤثر على الشاشات وملف PDF'),
           value: _arabicDigits,
           onChanged: (v) => setState(() => _arabicDigits = v),
+        ),
+        if (_lockSupported)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('قفل التطبيق بالبصمة'),
+            subtitle: const Text('يُطلب عند فتح التطبيق وبعد 30 ثانية في الخلفية'),
+            value: _appLock,
+            onChanged: (v) async {
+              if (v && !await AppLock.authenticate()) return;
+              setState(() => _appLock = v);
+            },
+          ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.history),
+          title: const Text('سجل التدقيق'),
+          subtitle: const Text('كل إنشاء وتعديل وحذف'),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const AuditScreen())),
         ),
         const SizedBox(height: 24),
         const Text('مسح الفواتير بالذكاء الاصطناعي',
