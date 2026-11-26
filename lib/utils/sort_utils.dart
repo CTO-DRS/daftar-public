@@ -1,3 +1,4 @@
+import 'number_utils.dart';
 import '../models/invoice_item.dart';
 
 enum SortField { itemCode, refNumber, quantity }
@@ -52,4 +53,18 @@ void sortItems(List<InvoiceItem> items, SortField field, bool ascending) {
   items
     ..clear()
     ..addAll(sorted);
+}
+
+/// بحث الأسطر: الكود والمرجع والنوع والملاحظات، وكذلك العدد والسعر والإجمالي.
+/// [q] مُطبَّع (أرقام لاتينية وحروف صغيرة).
+bool itemMatchesQuery(InvoiceItem it, String q) {
+  if (q.isEmpty) return true;
+  if ('${it.itemCode} ${it.refNumber} ${it.description} ${it.notes}'
+      .toLowerCase()
+      .contains(q)) {
+    return true;
+  }
+  return plainNumber(it.quantity).contains(q) ||
+      plainNumber(it.unitPrice).contains(q) ||
+      plainNumber(it.total).contains(q);
 }

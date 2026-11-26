@@ -331,9 +331,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     for (var i = 0; i < inv.items.length; i++) {
       final it = inv.items[i];
       if (q.isEmpty ||
-          '${it.itemCode} ${it.refNumber} ${it.description} ${it.notes}'
-              .toLowerCase()
-              .contains(q)) {
+          itemMatchesQuery(it, q)) {
         visible.add(i);
       }
     }
@@ -624,7 +622,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           controller: _filter,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: 'فلترة الأسطر (كود، مرجع، نوع)',
+            hintText: 'بحث في الأسطر (كود، مرجع، نوع، رقم)',
             prefixIcon: const Icon(Icons.filter_list),
             isDense: true,
             suffixIcon: _filter.text.isEmpty

@@ -54,4 +54,13 @@ void numberingTests() {
     expect(formatInvoiceNumber('INV-', 7, 4), 'INV-0007');
     expect(formatInvoiceNumber('', 15, 1), '15');
   });
+
+  test('item search matches numbers too', () {
+    final it = InvoiceItem(itemCode: 'A1', description: 'مفتاح', quantity: 12, unitPrice: 7.5);
+    expect(itemMatchesQuery(it, 'a1'), isTrue);
+    expect(itemMatchesQuery(it, '12'), isTrue);
+    expect(itemMatchesQuery(it, '7.5'), isTrue);
+    expect(itemMatchesQuery(it, '90'), isTrue); // الإجمالي 12 × 7.5
+    expect(itemMatchesQuery(it, '555'), isFalse);
+  });
 }
