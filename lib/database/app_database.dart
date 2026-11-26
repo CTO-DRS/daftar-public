@@ -53,7 +53,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 8,
+      version: 9,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -75,6 +75,11 @@ class AppDatabase {
         }
         if (o < 8) {
           await d.execute("ALTER TABLE items ADD COLUMN unit TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 9) {
+          await d.execute('ALTER TABLE items ADD COLUMN wholesale_qty REAL NOT NULL DEFAULT 0');
+          await d.execute('ALTER TABLE items ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
+          await d.execute("ALTER TABLE items ADD COLUMN wholesale_unit TEXT NOT NULL DEFAULT ''");
         }
         if (o < 7) {
           await d.execute(_recurringDdl);
@@ -115,7 +120,10 @@ class AppDatabase {
             quantity REAL NOT NULL DEFAULT 0,
             unit_price REAL NOT NULL DEFAULT 0,
             notes TEXT NOT NULL DEFAULT '',
-            unit TEXT NOT NULL DEFAULT ''
+            unit TEXT NOT NULL DEFAULT '',
+            wholesale_qty REAL NOT NULL DEFAULT 0,
+            wholesale_price REAL NOT NULL DEFAULT 0,
+            wholesale_unit TEXT NOT NULL DEFAULT ''
           )''');
         await d.execute(_partiesDdl);
         await d.execute(_recurringDdl);
@@ -132,7 +140,7 @@ class AppDatabase {
     final rows = await d.rawQuery('''
       SELECT TRIM(i.description) AS name,
              SUM(CASE WHEN v.note_type = 'credit' THEN -i.quantity ELSE i.quantity END) AS qty,
-             SUM(CASE WHEN v.note_type = 'credit' THEN -1 ELSE 1 END * i.quantity * i.unit_price) AS revenue
+             SUM(CASE WHEN v.note_type = 'credit' THEN -1 ELSE 1 END * (i.quantity * i.unit_price + i.wholesale_qty * i.wholesale_price)) AS revenue
       FROM items i JOIN invoices v ON v.id = i.invoice_id
       WHERE v.kind = 'invoice' AND v.status != 'draft' AND TRIM(i.description) != ''
         AND (? = '' OR v.currency = '' OR v.currency = ?)

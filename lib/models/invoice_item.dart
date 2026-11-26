@@ -9,6 +9,9 @@ class InvoiceItem {
   double unitPrice;
   String notes;
   String unit; // الوحدة: حبة، كرتون، كجم... أو نص حر
+  double wholesaleQty; // عدد الجملة (اختياري)
+  double wholesalePrice; // سعر الجملة للوحدة الواحدة (اختياري)
+  String wholesaleUnit; // وحدة الجملة: كرتون، درزن...
 
   /// يُضبط عندما يكتشف التدقيق خللاً في الصف (مسح OCR).
   bool flagged;
@@ -26,12 +29,21 @@ class InvoiceItem {
     this.unitPrice = 0,
     this.notes = '',
     this.unit = '',
+    this.wholesaleQty = 0,
+    this.wholesalePrice = 0,
+    this.wholesaleUnit = '',
     this.flagged = false,
     this.statedTotal,
   });
 
   /// الإجمالي = العدد × سعر الفردي.
-  double get total => quantity * unitPrice;
+  /// إجمالي الجملة = عدد الجملة × سعر الجملة.
+  double get wholesaleTotal => wholesaleQty * wholesalePrice;
+
+  bool get hasWholesale => wholesaleQty != 0 || wholesalePrice != 0;
+
+  /// الإجمالي = (العدد × سعر الفردي) + (عدد الجملة × سعر الجملة).
+  double get total => quantity * unitPrice + wholesaleTotal;
 
   /// سطر فارغ تماماً: يُحذف تلقائياً عند الحفظ.
   bool get isEmpty =>
@@ -40,7 +52,8 @@ class InvoiceItem {
       description.trim().isEmpty &&
       notes.trim().isEmpty &&
       quantity == 0 &&
-      unitPrice == 0;
+      unitPrice == 0 &&
+      !hasWholesale;
 
   InvoiceItem copy() => InvoiceItem(
         id: id,
@@ -52,6 +65,9 @@ class InvoiceItem {
         unitPrice: unitPrice,
         notes: notes,
         unit: unit,
+        wholesaleQty: wholesaleQty,
+        wholesalePrice: wholesalePrice,
+        wholesaleUnit: wholesaleUnit,
         flagged: flagged,
         statedTotal: statedTotal,
       );
@@ -67,6 +83,9 @@ class InvoiceItem {
         'unit_price': unitPrice,
         'notes': notes,
         'unit': unit,
+        'wholesale_qty': wholesaleQty,
+        'wholesale_price': wholesalePrice,
+        'wholesale_unit': wholesaleUnit,
       };
 
   factory InvoiceItem.fromMap(Map<String, Object?> m) => InvoiceItem(
@@ -79,5 +98,8 @@ class InvoiceItem {
         unitPrice: (m['unit_price'] as num?)?.toDouble() ?? 0,
         notes: (m['notes'] as String?) ?? '',
         unit: (m['unit'] as String?) ?? '',
+        wholesaleQty: (m['wholesale_qty'] as num?)?.toDouble() ?? 0,
+        wholesalePrice: (m['wholesale_price'] as num?)?.toDouble() ?? 0,
+        wholesaleUnit: (m['wholesale_unit'] as String?) ?? '',
       );
 }

@@ -60,6 +60,12 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       text: widget.item.unitPrice == 0 ? '' : plainNumber(widget.item.unitPrice));
   late final _notes = TextEditingController(text: widget.item.notes);
   late final _unit = TextEditingController(text: widget.item.unit);
+  late final _wQty = TextEditingController(
+      text: widget.item.wholesaleQty == 0 ? '' : plainNumber(widget.item.wholesaleQty));
+  late final _wPrice = TextEditingController(
+      text: widget.item.wholesalePrice == 0 ? '' : plainNumber(widget.item.wholesalePrice));
+  late final _wUnit = TextEditingController(text: widget.item.wholesaleUnit);
+  late bool _showWholesale = widget.item.hasWholesale;
   static const _unitPresets = [
     'عدد', 'حبة', 'درزن', 'كرتون', 'علبة', 'باكت', 'كيس', 'صندوق', 'رزمة', 'حزمة', 'لفة', 'طقم',
     'زجاجة', 'قارورة', 'برميل', 'جالون', 'كجم', 'جم', 'طن', 'رطل', 'أونصة', 'لتر', 'مل',
@@ -69,11 +75,12 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
   late bool _pinType = widget.pinType;
 
   double get _total =>
-      (parseNumber(_qty.text) ?? 0) * (parseNumber(_price.text) ?? 0);
+      (parseNumber(_qty.text) ?? 0) * (parseNumber(_price.text) ?? 0) +
+      (parseNumber(_wQty.text) ?? 0) * (parseNumber(_wPrice.text) ?? 0);
 
   @override
   void dispose() {
-    for (final c in [_code, _ref, _type, _qty, _price, _notes, _unit]) {
+    for (final c in [_code, _ref, _type, _qty, _price, _notes, _unit, _wQty, _wPrice, _wUnit]) {
       c.dispose();
     }
     super.dispose();
@@ -101,6 +108,9 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       ..unitPrice = parseNumber(_price.text) ?? 0
       ..notes = _notes.text.trim()
       ..unit = _unit.text.trim()
+      ..wholesaleQty = parseNumber(_wQty.text) ?? 0
+      ..wholesalePrice = parseNumber(_wPrice.text) ?? 0
+      ..wholesaleUnit = _wUnit.text.trim()
       ..flagged = false;
     Navigator.pop(context, ItemEditResult(it, addNext, _pinPrice, _pinType));
   }
@@ -184,6 +194,48 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                 onSelected: (on) => setState(() => _unit.text = on ? u : ''),
               ),
           ]),
+          const SizedBox(height: 4),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _showWholesale = !_showWholesale),
+              icon: Icon(_showWholesale ? Icons.expand_less : Icons.add_box_outlined, size: 18),
+              label: Text(_showWholesale ? 'إخفاء الجملة' : 'إضافة بيع بالجملة'),
+            ),
+          ),
+          if (_showWholesale) ...[
+            Row(children: [
+              Expanded(
+                  child: TextField(
+                      controller: _wQty,
+                      keyboardType: numKb,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(labelText: 'عدد الجملة'))),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: TextField(
+                      controller: _wPrice,
+                      keyboardType: numKb,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(labelText: 'سعر الجملة'))),
+            ]),
+            const SizedBox(height: 10),
+            TextField(
+                controller: _wUnit,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                    labelText: 'وحدة الجملة', hintText: 'كرتون، درزن، كيس...')),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 0, children: [
+              for (final u in const ['كرتون', 'درزن', 'كيس', 'صندوق', 'باكت', 'رزمة'])
+                ChoiceChip(
+                  label: Text(u),
+                  visualDensity: VisualDensity.compact,
+                  selected: _wUnit.text.trim() == u,
+                  onSelected: (on) => setState(() => _wUnit.text = on ? u : ''),
+                ),
+            ]),
+          ],
           const SizedBox(height: 10),
           TextField(
               controller: _notes,

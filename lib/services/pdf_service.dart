@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/invoice.dart';
+import '../models/invoice_item.dart';
 import '../utils/brand_color.dart';
 import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
@@ -199,31 +200,41 @@ class PdfService {
     final money = currency;
 
     // ---- الجدول: الأعمدة من اليسار إلى اليمين (م أقصى اليمين) ----
-    final headers = ['ملاحظات', 'الإجمالي', 'سعر الفردي', 'العدد', 'النوع / الوصف', 'الرقم المرجعي', 'كود الصنف', 'م'];
-    final data = <List<String>>[];
-    for (var i = 0; i < items.length; i++) {
-      final it = items[i];
-      final u = it.unit.trim();
-      data.add([
-        it.notes,
-        formatMoney(it.total),
-        formatMoney(it.unitPrice),
-        u.isEmpty ? formatQty(it.quantity) : '${formatQty(it.quantity)} $u',
-        it.description,
-        it.refNumber,
-        it.itemCode,
-        localizeDigits('${i + 1}'),
-      ]);
-    }
+    // الأعمدة تظهر حسب البيانات: الجملة والمرجع والكود والملاحظات تختفي إن كانت فارغة.
+    final anyWholesale = items.any((e) => e.hasWholesale);
+    final anyRef = items.any((e) => e.refNumber.trim().isNotEmpty);
+    final anyCode = items.any((e) => e.itemCode.trim().isNotEmpty);
+    final anyNotes = items.any((e) => e.notes.trim().isNotEmpty);
+    String wq(InvoiceItem it) => !it.hasWholesale
+        ? ''
+        : (it.wholesaleUnit.trim().isEmpty
+            ? formatQty(it.wholesaleQty)
+            : '${formatQty(it.wholesaleQty)} ${it.wholesaleUnit.trim()}');
+    // (العنوان، العرض، محاذاة لليمين؟، القيمة) من اليسار إلى اليمين (م أقصى اليمين).
+    final cols = <(String, double, bool, String Function(InvoiceItem, int))>[
+      if (anyNotes) ('ملاحظات', compact ? 1.8 : 2.0, true, (it, i) => it.notes),
+      ('الإجمالي', 1.6, false, (it, i) => formatMoney(it.total)),
+      if (anyWholesale) ('سعر الجملة', 1.4, false, (it, i) => it.hasWholesale ? formatMoney(it.wholesalePrice) : ''),
+      if (anyWholesale) ('عدد الجملة', 1.4, false, (it, i) => wq(it)),
+      ('سعر الفردي', 1.4, false, (it, i) => it.quantity == 0 && it.unitPrice == 0 ? '' : formatMoney(it.unitPrice)),
+      ('العدد', 1.0, false, (it, i) => it.quantity == 0 && it.unitPrice == 0 ? '' : formatQty(it.quantity)),
+      ('الوحدة', 1.1, false, (it, i) => it.unit.trim()),
+      ('النوع / الوصف', 3.0, true, (it, i) => it.description),
+      if (anyRef) ('الرقم المرجعي', 1.5, false, (it, i) => it.refNumber),
+      if (anyCode) ('كود الصنف', 1.5, false, (it, i) => it.itemCode),
+      ('م', 0, false, (it, i) => localizeDigits('${i + 1}')),
+    ];
+    final headers = [for (final c in cols) c.$1];
+    final data = <List<String>>[
+      for (var i = 0; i < items.length; i++) [for (final c in cols) c.$4(items[i], i)]
+    ];
     final colWidths = <int, pw.TableColumnWidth>{
-      0: pw.FlexColumnWidth(compact ? 1.8 : 2.2),
-      1: const pw.FlexColumnWidth(1.6),
-      2: const pw.FlexColumnWidth(1.4),
-      3: const pw.FlexColumnWidth(1.4),
-      4: const pw.FlexColumnWidth(3.0),
-      5: const pw.FlexColumnWidth(1.5),
-      6: const pw.FlexColumnWidth(1.5),
-      7: const pw.FixedColumnWidth(24),
+      for (var i = 0; i < cols.length; i++)
+        i: cols[i].$2 == 0 ? const pw.FixedColumnWidth(24) : pw.FlexColumnWidth(cols[i].$2),
+    };
+    final rightAligned = <int, pw.Alignment>{
+      for (var i = 0; i < cols.length; i++)
+        if (cols[i].$3) i: pw.Alignment.centerRight,
     };
     final pad = pw.EdgeInsets.symmetric(horizontal: 4, vertical: compact ? 2.5 : (modern ? 6 : 4.5));
 
@@ -242,7 +253,7 @@ class PdfService {
           cellPadding: pad,
           headerAlignment: pw.Alignment.center,
           cellAlignment: pw.Alignment.center,
-          cellAlignments: {0: pw.Alignment.centerRight, 4: pw.Alignment.centerRight},
+          cellAlignments: rightAligned,
           columnWidths: colWidths,
         );
       }
@@ -260,7 +271,7 @@ class PdfService {
         oddRowDecoration: compact ? null : pw.BoxDecoration(color: softTint),
         headerAlignment: pw.Alignment.center,
         cellAlignment: pw.Alignment.center,
-        cellAlignments: {0: pw.Alignment.centerRight, 4: pw.Alignment.centerRight},
+        cellAlignments: rightAligned,
         columnWidths: colWidths,
       );
     }
