@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import '../services/pdf_service.dart' show PdfTemplate, PdfTemplateX;
+import '../utils/brand_color.dart';
 import '../main.dart' show themeModeNotifier, themeModeFrom;
 
 import '../services/logo_service.dart';
@@ -128,6 +130,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'عند تعبئة الرقم الضريبي وتفعيل الضريبة يظهر رمز QR بصيغة المرحلة الأولى في ملف PDF. هذا تنسيق فقط وليس اعتماداً من هيئة الزكاة والضريبة والجمارك.',
           style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
         ),
+        const SizedBox(height: 24),
+        const Text('قالب الفاتورة (PDF)', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: [
+            for (final t in PdfTemplate.values)
+              ButtonSegment(value: t.name, label: Text(t.label)),
+          ],
+          selected: {SettingsService.instance.pdfTemplate},
+          onSelectionChanged: (v) {
+            SettingsService.instance.pdfTemplate = v.first;
+            setState(() {});
+          },
+        ),
+        const SizedBox(height: 6),
+        Text(PdfTemplateX.fromDb(SettingsService.instance.pdfTemplate).hint,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+        const SizedBox(height: 14),
+        const Text('لون الترويسة', style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          ChoiceChip(
+            avatar: const Icon(Icons.auto_awesome, size: 16),
+            label: const Text('تلقائي من الشعار'),
+            selected: SettingsService.instance.brandColor == null,
+            onSelected: (_) {
+              SettingsService.instance.brandColor = null;
+              setState(() {});
+            },
+          ),
+          for (final c in brandSwatches)
+            InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () {
+                SettingsService.instance.brandColor = c;
+                setState(() {});
+              },
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Color(c),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      width: SettingsService.instance.brandColor == c ? 3 : 1,
+                      color: SettingsService.instance.brandColor == c
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Colors.black12),
+                ),
+                child: SettingsService.instance.brandColor == c
+                    ? const Icon(Icons.check, size: 18, color: Colors.white)
+                    : null,
+              ),
+            ),
+        ]),
         const SizedBox(height: 24),
         const Text('المظهر', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),

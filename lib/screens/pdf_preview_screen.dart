@@ -26,14 +26,17 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
 
   Future<Uint8List> _build() async {
     final party = await AppDatabase.instance.partyByName(widget.invoice.party);
+    final logo = await LogoService.load();
     return PdfService.build(
         widget.invoice,
+        template: PdfTemplateX.fromDb(SettingsService.instance.pdfTemplate),
+        brandColor: SettingsService.instance.brandColor,
         partyPhone: party?.phone ?? '',
         partyAddress: party?.address ?? '',
         sellerVat: SettingsService.instance.sellerVat,
         currency: widget.invoice.currencyOr(SettingsService.instance.currency),
         company: SettingsService.instance.companyName,
-        logo: await LogoService.load(),
+        logo: logo,
     );
   }
 

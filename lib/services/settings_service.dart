@@ -31,6 +31,15 @@ class SettingsService {
   String get themeMode => _p.getString('theme_mode') ?? 'system';
   set themeMode(String v) => _p.setString('theme_mode', v);
 
+  /// لون ترويسة PDF (ARGB) أو null = تلقائي من الشعار.
+  int? get brandColor => _p.getInt('brand_color');
+  set brandColor(int? v) =>
+      v == null ? _p.remove('brand_color') : _p.setInt('brand_color', v);
+
+  /// قالب PDF: classic / modern / compact.
+  String get pdfTemplate => _p.getString('pdf_template') ?? 'classic';
+  set pdfTemplate(String v) => _p.setString('pdf_template', v);
+
   String get currency => _p.getString('currency') ?? 'ر.س';
   set currency(String v) => _p.setString('currency', v.trim());
 

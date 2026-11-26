@@ -32,10 +32,21 @@ void main() {
     img.fill(logoImg, color: img.ColorRgb8(15, 118, 110));
     final logo = LogoService.normalize(Uint8List.fromList(img.encodePng(logoImg)));
     expect(img.decodePng(logo)!.width, 400);
-    final bytes = await PdfService.build(inv, company: 'شركة دفتر', logo: logo, partyPhone: '0551234567', partyAddress: 'المدينة المنورة', sellerVat: '310122393500003');
-    expect(bytes.length, greaterThan(5000));
-    expect(String.fromCharCodes(bytes.take(4)), '%PDF');
     final out = Platform.environment['PDF_OUT'];
-    if (out != null) File(out).writeAsBytesSync(bytes);
+    for (final t in PdfTemplate.values) {
+      inv.paidAmount = 5000;
+      inv.status = InvoiceStatus.confirmed;
+      final bytes = await PdfService.build(inv,
+          company: 'شركة دفتر',
+          logo: logo,
+          partyPhone: '0551234567',
+          partyAddress: 'المدينة المنورة',
+          sellerVat: '310122393500003',
+          template: t,
+          brandColor: t == PdfTemplate.modern ? 0xFF1E3A5F : null);
+      expect(bytes.length, greaterThan(5000));
+      expect(String.fromCharCodes(bytes.take(4)), '%PDF');
+      if (out != null) File('$out-${t.name}.pdf').writeAsBytesSync(bytes);
+    }
   });
 }
