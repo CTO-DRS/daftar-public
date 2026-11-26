@@ -193,7 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const CircleAvatar(
                 backgroundImage: AssetImage('assets/images/developer.jpg')),
             title: const Text('عن المطور'),
-            subtitle: const Text('CTO: DRS · cto-drs.com', textDirection: TextDirection.ltr),
+            subtitle: const Text('CTO.DRS · cto-drs.com', textDirection: TextDirection.ltr),
             trailing: const Icon(Icons.chevron_left),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const AboutScreen())),

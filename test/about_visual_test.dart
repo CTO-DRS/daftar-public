@@ -23,8 +23,11 @@ void main() {
         await l.load();
         final m = FontLoader('MaterialIcons')..addFont(Future.value(ByteData.sublistView(File('/home/sandbox/flutter/bin/cache/dart-sdk/bin/resources/devtools/assets/fonts/MaterialIcons-Regular.otf').readAsBytesSync())));
         await m.load();
+        final fa = FontLoader('FABrands')
+          ..addFont(Future.value(ByteData.sublistView(File('assets/fonts/FABrands.otf').readAsBytesSync())));
+        await fa.load();
       });
-      t.view.physicalSize = const Size(540, 700);
+      t.view.physicalSize = const Size(540, 820);
       t.view.devicePixelRatio = 1.5;
       final key = GlobalKey();
       await t.pumpWidget(MaterialApp(
@@ -35,8 +38,9 @@ void main() {
             child: RepaintBoundary(
                 key: key,
                 child: const Scaffold(
-                    body: SafeArea(
-                        child: Padding(padding: EdgeInsets.all(16), child: DeveloperCard()))))),
+                    body: DeveloperBackdrop(
+                        child: SafeArea(
+                            child: Padding(padding: EdgeInsets.all(16), child: DeveloperSection())))))),
       ));
       await t.runAsync(() async {
         await precacheImage(const AssetImage('assets/images/developer.jpg'),
