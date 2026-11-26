@@ -67,6 +67,8 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
   late final _wPrice = TextEditingController(
       text: widget.item.wholesalePrice == 0 ? '' : plainNumber(widget.item.wholesalePrice));
   late final _wUnit = TextEditingController(text: widget.item.wholesaleUnit);
+  late final _cost = TextEditingController(
+      text: widget.item.costPrice == 0 ? '' : plainNumber(widget.item.costPrice));
   late final _pack = TextEditingController(
       text: widget.item.packSize == 0 ? '' : plainNumber(widget.item.packSize));
   late bool _showWholesale = widget.item.hasWholesale || widget.item.packSize > 0;
@@ -136,7 +138,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
 
   @override
   void dispose() {
-    for (final c in [_code, _ref, _type, _qty, _price, _notes, _unit, _wQty, _wPrice, _wUnit, _pack, _tMin, _tPrice]) {
+    for (final c in [_code, _ref, _type, _qty, _price, _notes, _unit, _wQty, _wPrice, _wUnit, _pack, _cost, _tMin, _tPrice]) {
       c.dispose();
     }
     super.dispose();
@@ -168,6 +170,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       ..wholesalePrice = parseNumber(_wPrice.text) ?? 0
       ..wholesaleUnit = _wUnit.text.trim()
       ..packSize = parseNumber(_pack.text) ?? 0
+      ..costPrice = parseNumber(_cost.text) ?? 0
       ..flagged = false;
     if (_tiersDirty) {
       AppDatabase.instance.saveTiers(_key, _tiers);
@@ -242,6 +245,14 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
             _pin(_pinPrice, () => setState(() => _pinPrice = !_pinPrice),
                 'تثبيت السعر الفردي'),
           ]),
+          const SizedBox(height: 10),
+          TextField(
+              controller: _cost,
+              keyboardType: numKb,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                  labelText: 'سعر التكلفة للقطعة (اختياري)',
+                  helperText: 'يُستخدم لحساب الربح في الذكاء المالي')),
           const SizedBox(height: 10),
           TextField(
               controller: _unit,

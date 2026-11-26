@@ -163,6 +163,7 @@ InvoiceItem? _parseLine(String chunk, List<InvoiceItem> catalog) {
     if (item.unit.isEmpty) item.unit = hit.unit;
     item.unitPrice = hit.unitPrice;
     item.packSize = hit.packSize;
+    item.costPrice = hit.costPrice;
   }
   if (price != null) item.unitPrice = price;
   // وحدة جملة معروفة (كرتون/درزن) مع حجم عبوة: انقل الكمية لخانة الجملة.

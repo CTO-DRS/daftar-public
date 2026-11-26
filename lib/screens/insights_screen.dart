@@ -19,6 +19,7 @@ class InsightsScreen extends StatefulWidget {
 
 class _InsightsScreenState extends State<InsightsScreen> {
   InsightsReport? _r;
+  ProfitSummary? _today, _month;
 
   @override
   void initState() {
@@ -32,7 +33,18 @@ class _InsightsScreenState extends State<InsightsScreen> {
     final all = await AppDatabase.instance.listInvoices();
     final prods = await AppDatabase.instance.topProducts(currency: cur);
     final r = computeInsights(all, DateTime.now(), currency: cur, products: prods);
-    if (mounted) setState(() => _r = r);
+    final now = DateTime.now();
+    final today = await AppDatabase.instance
+        .profitSince(DateTime(now.year, now.month, now.day), currency: cur);
+    final month = await AppDatabase.instance
+        .profitSince(DateTime(now.year, now.month), currency: cur);
+    if (mounted) {
+      setState(() {
+        _r = r;
+        _today = today;
+        _month = month;
+      });
+    }
   }
 
   @override
@@ -50,6 +62,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               : ContentWidth(
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
                   _Alerts(r.alerts),
+                  if (_today != null && _month != null) _ProfitCard(_today!, _month!),
                   _Section('توقع التحصيل', Icons.event_available_outlined),
                   _ForecastGrid(r.forecast),
                   _Section('أعمار الديون', Icons.timelapse),
@@ -308,5 +321,59 @@ class _Products extends StatelessWidget {
           ]),
         ),
     ]);
+  }
+}
+
+class _ProfitCard extends StatelessWidget {
+  final ProfitSummary today, month;
+  const _ProfitCard(this.today, this.month);
+
+  Widget _col(BuildContext c, String title, ProfitSummary p) {
+    final cs = Theme.of(c).colorScheme;
+    return Expanded(
+      child: Column(children: [
+        Text(title, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(formatMoney(p.sales),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        const Text('مبيعات', style: TextStyle(fontSize: 11)),
+        const SizedBox(height: 6),
+        Text(p.hasCosts ? formatMoney(p.profit) : '—',
+            style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: p.profit >= 0 ? cs.primary : cs.error)),
+        Text(
+            p.hasCosts
+                ? 'ربح • هامش ${localizeDigits((p.margin * 100).toStringAsFixed(0))}%'
+                : 'ربح',
+            style: const TextStyle(fontSize: 11)),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final noCost = !today.hasCosts && !month.hasCosts;
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(children: [
+          Row(children: [
+            _col(context, 'اليوم', today),
+            _col(context, 'هذا الشهر', month),
+          ]),
+          if (noCost) ...[
+            const SizedBox(height: 10),
+            Text(
+                'أدخل «سعر التكلفة» في الأصناف ليحسب دفتر الربح والهامش تلقائياً.',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.outline)),
+          ],
+        ]),
+      ),
+    );
   }
 }

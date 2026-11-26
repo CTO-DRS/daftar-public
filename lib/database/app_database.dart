@@ -72,7 +72,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 11,
+      version: 12,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -99,6 +99,9 @@ class AppDatabase {
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_qty REAL NOT NULL DEFAULT 0');
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
           await d.execute("ALTER TABLE items ADD COLUMN wholesale_unit TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 12) {
+          await d.execute('ALTER TABLE items ADD COLUMN cost_price REAL NOT NULL DEFAULT 0');
         }
         if (o < 11) {
           await d.execute(_auditDdl);
@@ -150,7 +153,8 @@ class AppDatabase {
             wholesale_qty REAL NOT NULL DEFAULT 0,
             wholesale_price REAL NOT NULL DEFAULT 0,
             wholesale_unit TEXT NOT NULL DEFAULT '',
-            pack_size REAL NOT NULL DEFAULT 0
+            pack_size REAL NOT NULL DEFAULT 0,
+            cost_price REAL NOT NULL DEFAULT 0
           )''');
         await d.execute(_tiersDdl);
         await d.execute(_auditDdl);
@@ -203,6 +207,30 @@ class AppDatabase {
         .map((m) => ProductSales((m['name'] as String?) ?? '',
             (m['qty'] as num?)?.toDouble() ?? 0, (m['revenue'] as num?)?.toDouble() ?? 0))
         .toList();
+  }
+
+  /// ملخص الربح من [from] حتى الآن: المبيعات، الربح، ومبيعات الأسطر التي لها تكلفة.
+  /// الفواتير المعتمدة فقط؛ الإشعار الدائن يطرح والمدين يضيف.
+  Future<ProfitSummary> profitSince(DateTime from, {String currency = ''}) async {
+    final d = await db;
+    final rows = await d.rawQuery('''
+      SELECT
+        SUM(sgn * rev) AS sales,
+        SUM(CASE WHEN cost_price > 0 THEN sgn * rev ELSE 0 END) AS costed_sales,
+        SUM(CASE WHEN cost_price > 0 THEN sgn * (rev - cost_price * (quantity + wholesale_qty * CASE WHEN pack_size > 0 THEN pack_size ELSE 1 END)) ELSE 0 END) AS profit,
+        COUNT(DISTINCT invoice_id) AS docs
+      FROM (
+        SELECT i.*, v.id AS invoice_id,
+               CASE WHEN v.note_type = 'credit' THEN -1 ELSE 1 END AS sgn,
+               (i.quantity * i.unit_price + i.wholesale_qty * i.wholesale_price) AS rev
+        FROM items i JOIN invoices v ON v.id = i.invoice_id
+        WHERE v.kind = 'invoice' AND v.status != 'draft' AND v.date >= ?
+          AND (? = '' OR v.currency = '' OR v.currency = ?)
+      )
+    ''', [from.millisecondsSinceEpoch, currency, currency]);
+    final m = rows.first;
+    double n(String k) => (m[k] as num?)?.toDouble() ?? 0;
+    return ProfitSummary(n('sales'), n('costed_sales'), n('profit'), (m['docs'] as num?)?.toInt() ?? 0);
   }
 
   /// قائمة الفواتير مع إمكانية البحث بالرقم أو اسم العميل.
@@ -458,7 +486,7 @@ extension CatalogQueries on AppDatabase {
   Future<Map<String, InvoiceItem>> itemCatalog() async {
     final d = await db;
     final r = await d.rawQuery(
-        "SELECT i.item_code, i.ref_number, i.description, i.unit_price FROM items i "
+        "SELECT i.item_code, i.ref_number, i.description, i.unit_price, i.cost_price FROM items i "
         "JOIN (SELECT item_code, MAX(id) mid FROM items WHERE item_code != '' GROUP BY item_code) t ON i.id = t.mid");
     return {
       for (final m in r)
@@ -467,6 +495,7 @@ extension CatalogQueries on AppDatabase {
           refNumber: (m['ref_number'] as String?) ?? '',
           description: (m['description'] as String?) ?? '',
           unitPrice: (m['unit_price'] as num?)?.toDouble() ?? 0,
+          costPrice: (m['cost_price'] as num?)?.toDouble() ?? 0,
         )
     };
   }
@@ -542,4 +571,12 @@ class RecurringInfo {
       required this.next,
       required this.number,
       required this.party});
+}
+
+class ProfitSummary {
+  final double sales, costedSales, profit;
+  final int docs;
+  const ProfitSummary(this.sales, this.costedSales, this.profit, this.docs);
+  double get margin => costedSales > 0 ? profit / costedSales : 0;
+  bool get hasCosts => costedSales > 0;
 }
