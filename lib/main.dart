@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -11,6 +12,15 @@ Future<void> main() async {
   useArabicDigits = SettingsService.instance.arabicDigits;
   runApp(const DaftarApp());
 }
+
+/// انتقالات ناعمة موحّدة (تتلاشى وتنزلق قليلاً) على كل المنصات.
+final _pageTransitions = PageTransitionsTheme(builders: {
+  TargetPlatform.android: const FadeForwardsPageTransitionsBuilder(),
+  TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
+  TargetPlatform.windows: const FadeForwardsPageTransitionsBuilder(),
+  TargetPlatform.linux: const FadeForwardsPageTransitionsBuilder(),
+  TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
+});
 
 class DaftarApp extends StatelessWidget {
   const DaftarApp({super.key});
@@ -35,6 +45,8 @@ class DaftarApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: scheme,
         fontFamily: 'IBMPlexSansArabic',
+        pageTransitionsTheme: _pageTransitions,
+        snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
         scaffoldBackgroundColor: const Color(0xFFF6F8F8),
         appBarTheme: AppBarTheme(
           backgroundColor: scheme.surface,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../widgets/empty_state.dart';
 
 import '../database/app_database.dart';
@@ -143,6 +144,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     if (mounted) {
       _c!.markSaved();
       if (!quiet) {
+        HapticFeedback.lightImpact();
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('تم الحفظ')));
       }
