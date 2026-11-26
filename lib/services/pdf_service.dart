@@ -59,7 +59,7 @@ class PdfService {
         it.notes,
         formatMoney(it.total),
         formatMoney(it.unitPrice),
-        formatQty(it.quantity),
+        it.unit.trim().isEmpty ? formatQty(it.quantity) : '${formatQty(it.quantity)} ${it.unit.trim()}',
         it.description,
         it.refNumber,
         it.itemCode,
@@ -72,7 +72,7 @@ class PdfService {
       0: const pw.FlexColumnWidth(2.2), // ملاحظات
       1: const pw.FlexColumnWidth(1.6), // الإجمالي
       2: const pw.FlexColumnWidth(1.4), // الفردي
-      3: const pw.FlexColumnWidth(1.0), // العدد
+      3: const pw.FlexColumnWidth(1.4), // العدد + الوحدة
       4: const pw.FlexColumnWidth(3.0), // النوع
       5: const pw.FlexColumnWidth(1.5), // المرجع
       6: const pw.FlexColumnWidth(1.5), // الكود

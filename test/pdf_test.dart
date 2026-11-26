@@ -18,7 +18,7 @@ void main() {
       notes: 'تسليم خلال أسبوع',
       items: List.generate(
         40,
-        (i) => InvoiceItem(
+        (i) => InvoiceItem(unit: i.isEven ? 'درزن' : 'كرتون',
           itemCode: 'A${i + 1}',
           refNumber: '${100 + i}',
           description: 'مفتاح كهربائي مزدوج',

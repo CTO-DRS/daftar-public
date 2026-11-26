@@ -59,6 +59,8 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
   late final _price = TextEditingController(
       text: widget.item.unitPrice == 0 ? '' : plainNumber(widget.item.unitPrice));
   late final _notes = TextEditingController(text: widget.item.notes);
+  late final _unit = TextEditingController(text: widget.item.unit);
+  static const _unitPresets = ['حبة', 'عدد', 'كرتون', 'درزن', 'كجم', 'جم', 'متر', 'سم', 'لتر', 'ساعة', 'يوم', 'خدمة'];
   late bool _pinPrice = widget.pinPrice;
   late bool _pinType = widget.pinType;
 
@@ -67,7 +69,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
 
   @override
   void dispose() {
-    for (final c in [_code, _ref, _type, _qty, _price, _notes]) {
+    for (final c in [_code, _ref, _type, _qty, _price, _notes, _unit]) {
       c.dispose();
     }
     super.dispose();
@@ -94,6 +96,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       ..quantity = parseNumber(_qty.text) ?? 0
       ..unitPrice = parseNumber(_price.text) ?? 0
       ..notes = _notes.text.trim()
+      ..unit = _unit.text.trim()
       ..flagged = false;
     Navigator.pop(context, ItemEditResult(it, addNext, _pinPrice, _pinType));
   }
@@ -160,6 +163,22 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                         const InputDecoration(labelText: 'سعر الفردي'))),
             _pin(_pinPrice, () => setState(() => _pinPrice = !_pinPrice),
                 'تثبيت السعر الفردي'),
+          ]),
+          const SizedBox(height: 10),
+          TextField(
+              controller: _unit,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                  labelText: 'الوحدة', hintText: 'اختر أو اكتب وحدة أخرى')),
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 0, children: [
+            for (final u in _unitPresets)
+              ChoiceChip(
+                label: Text(u),
+                visualDensity: VisualDensity.compact,
+                selected: _unit.text.trim() == u,
+                onSelected: (on) => setState(() => _unit.text = on ? u : ''),
+              ),
           ]),
           const SizedBox(height: 10),
           TextField(

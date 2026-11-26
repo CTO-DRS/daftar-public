@@ -8,6 +8,7 @@ class InvoiceItem {
   double quantity;
   double unitPrice;
   String notes;
+  String unit; // الوحدة: حبة، كرتون، كجم... أو نص حر
 
   /// يُضبط عندما يكتشف التدقيق خللاً في الصف (مسح OCR).
   bool flagged;
@@ -24,6 +25,7 @@ class InvoiceItem {
     this.quantity = 0,
     this.unitPrice = 0,
     this.notes = '',
+    this.unit = '',
     this.flagged = false,
     this.statedTotal,
   });
@@ -49,6 +51,7 @@ class InvoiceItem {
         quantity: quantity,
         unitPrice: unitPrice,
         notes: notes,
+        unit: unit,
         flagged: flagged,
         statedTotal: statedTotal,
       );
@@ -63,6 +66,7 @@ class InvoiceItem {
         'quantity': quantity,
         'unit_price': unitPrice,
         'notes': notes,
+        'unit': unit,
       };
 
   factory InvoiceItem.fromMap(Map<String, Object?> m) => InvoiceItem(
@@ -74,5 +78,6 @@ class InvoiceItem {
         quantity: (m['quantity'] as num?)?.toDouble() ?? 0,
         unitPrice: (m['unit_price'] as num?)?.toDouble() ?? 0,
         notes: (m['notes'] as String?) ?? '',
+        unit: (m['unit'] as String?) ?? '',
       );
 }

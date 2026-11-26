@@ -52,7 +52,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 7,
+      version: 8,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -71,6 +71,9 @@ class AppDatabase {
         }
         if (o < 6) {
           await d.execute('ALTER TABLE invoices ADD COLUMN vat_rate REAL NOT NULL DEFAULT 0');
+        }
+        if (o < 8) {
+          await d.execute("ALTER TABLE items ADD COLUMN unit TEXT NOT NULL DEFAULT ''");
         }
         if (o < 7) {
           await d.execute(_recurringDdl);
@@ -110,7 +113,8 @@ class AppDatabase {
             description TEXT NOT NULL DEFAULT '',
             quantity REAL NOT NULL DEFAULT 0,
             unit_price REAL NOT NULL DEFAULT 0,
-            notes TEXT NOT NULL DEFAULT ''
+            notes TEXT NOT NULL DEFAULT '',
+            unit TEXT NOT NULL DEFAULT ''
           )''');
         await d.execute(_partiesDdl);
         await d.execute(_recurringDdl);

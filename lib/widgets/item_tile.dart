@@ -75,7 +75,7 @@ class ItemTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${formatQty(item.quantity)} × ${formatMoney(item.unitPrice)}',
+                    '${formatQty(item.quantity)}${item.unit.trim().isEmpty ? '' : ' ${item.unit.trim()}'} × ${formatMoney(item.unitPrice)}',
                     style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
                   ),
                   if (item.notes.isNotEmpty)
