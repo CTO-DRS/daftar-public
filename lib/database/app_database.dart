@@ -173,10 +173,11 @@ class AppDatabase {
   }
 
   /// الرقم التالي حسب إعدادات الترقيم: بادئة + رقم متسلسل بعدد خانات ثابت.
-  Future<String> nextNumber() async {
+  Future<String> nextNumber([DocKind kind = DocKind.invoice]) async {
     final d = await db;
     final st = SettingsService.instance;
-    final prefix = st.numberPrefix;
+    final prefix =
+        kind == DocKind.inventory ? st.inventoryPrefix : st.numberPrefix;
     final rows = await d.query('invoices', columns: ['number']);
     var max = st.numberStart - 1;
     for (final r in rows) {

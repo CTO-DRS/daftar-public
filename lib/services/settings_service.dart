@@ -39,6 +39,9 @@ class SettingsService {
   /// ترقيم الفواتير: بادئة (مثل INV-)، أول رقم، عدد الخانات.
   String get numberPrefix => _p.getString('num_prefix') ?? '';
   set numberPrefix(String v) => _p.setString('num_prefix', v.trim());
+  /// بادئة ترقيم جداول الجرد (تسلسل مستقل عن الفواتير).
+  String get inventoryPrefix => _p.getString('num_prefix_inv') ?? 'JRD-';
+  set inventoryPrefix(String v) => _p.setString('num_prefix_inv', v.trim());
   int get numberStart => _p.getInt('num_start') ?? 1;
   set numberStart(int v) => _p.setInt('num_start', v < 1 ? 1 : v);
   int get numberPadding => _p.getInt('num_padding') ?? 1;

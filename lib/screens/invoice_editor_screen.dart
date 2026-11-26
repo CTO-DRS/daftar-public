@@ -65,7 +65,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       inv = (await _db.getInvoice(widget.invoiceId!))!;
       _headerOpen = false;
     } else {
-      inv = Invoice(kind: widget.newKind, number: await _db.nextNumber());
+      inv = Invoice(kind: widget.newKind, number: await _db.nextNumber(widget.newKind));
     }
     _catalog = await _db.itemCatalog();
     _partyNames = await _db.partyNames();

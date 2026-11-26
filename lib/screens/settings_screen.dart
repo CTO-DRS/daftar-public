@@ -21,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final _gModel = TextEditingController(text: s.geminiModel);
   late final _oModel = TextEditingController(text: s.openrouterModel);
   late final _prefix = TextEditingController(text: s.numberPrefix);
+  late final _prefixInv = TextEditingController(text: s.inventoryPrefix);
   late final _start = TextEditingController(text: '${s.numberStart}');
   late final _pad = TextEditingController(text: '${s.numberPadding}');
   late OcrProvider _provider = s.provider;
@@ -35,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     s.openrouterModel =
         _oModel.text.isEmpty ? 'google/gemini-2.5-flash' : _oModel.text;
     s.numberPrefix = _prefix.text;
+    s.inventoryPrefix = _prefixInv.text;
     s.numberStart = parseNumber(_start.text)?.toInt() ?? 1;
     s.numberPadding = parseNumber(_pad.text)?.toInt() ?? 1;
     s.provider = _provider;
@@ -121,6 +123,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: 'عدد الخانات'))),
         ]),
+        const SizedBox(height: 8),
+        TextField(
+            controller: _prefixInv,
+            textDirection: TextDirection.ltr,
+            decoration: const InputDecoration(
+                labelText: 'بادئة جداول الجرد (تسلسل مستقل، مثل JRD-)')),
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
