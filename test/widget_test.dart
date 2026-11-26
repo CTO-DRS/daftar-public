@@ -1,3 +1,4 @@
+import 'package:daftar/database/app_database.dart' show formatInvoiceNumber;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:daftar/models/invoice.dart';
 import 'package:daftar/models/invoice_item.dart';
@@ -6,6 +7,7 @@ import 'package:daftar/utils/sort_utils.dart';
 
 void main() {
   digitTests();
+  numberingTests();
   test('Arabic-Indic digits parse', () {
     expect(parseNumber('١٢٣'), 123);
     expect(parseNumber('١٢٫٥'), 12.5);
@@ -44,5 +46,12 @@ void digitTests() {
     expect(formatMoney(1250.5), '١٬٢٥٠٫٥');
     useArabicDigits = false;
     expect(formatMoney(1250.5), '1,250.5');
+  });
+}
+
+void numberingTests() {
+  test('invoice number formatting', () {
+    expect(formatInvoiceNumber('INV-', 7, 4), 'INV-0007');
+    expect(formatInvoiceNumber('', 15, 1), '15');
   });
 }

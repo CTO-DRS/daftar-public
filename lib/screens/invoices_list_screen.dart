@@ -9,6 +9,7 @@ import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
 import 'scan_flow.dart';
+import 'parties_screen.dart';
 import 'settings_screen.dart';
 
 /// الشاشة الرئيسية: قائمة الفواتير وجداول الجرد.
@@ -108,6 +109,12 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       appBar: AppBar(
         title: const Text('دفتر'),
         actions: [
+          IconButton(
+            tooltip: 'العملاء والموردون',
+            icon: const Icon(Icons.people_outline),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PartiesScreen())),
+          ),
           IconButton(
             tooltip: 'الإعدادات',
             icon: const Icon(Icons.settings_outlined),

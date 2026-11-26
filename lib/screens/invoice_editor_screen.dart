@@ -33,11 +33,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _dirty = false;
   bool _headerOpen = true;
   Map<String, InvoiceItem> _catalog = {};
+  List<String> _partyNames = [];
 
   final _number = TextEditingController();
   final _party = TextEditingController();
   final _notes = TextEditingController();
   final _filter = TextEditingController();
+  final _partyFocus = FocusNode();
 
   // تثبيت السعر والنوع
   bool _pinPrice = false;
@@ -68,6 +70,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       inv = Invoice(kind: widget.newKind, number: await _db.nextNumber());
     }
     _catalog = await _db.itemCatalog();
+    _partyNames = await _db.partyNames();
     _number.text = inv.number;
     _party.text = inv.party;
     _notes.text = inv.notes;
@@ -80,6 +83,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     for (final c in [_number, _party, _notes, _filter]) {
       c.dispose();
     }
+    _partyFocus.dispose();
     super.dispose();
   }
 
@@ -475,11 +479,39 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 ]),
               ),
               const SizedBox(height: 10),
-              TextField(
-                controller: _party,
-                onChanged: (_) => _touch(),
-                decoration:
-                    const InputDecoration(labelText: 'اسم العميل / المورد'),
+              RawAutocomplete<String>(
+                textEditingController: _party,
+                focusNode: _partyFocus,
+                optionsBuilder: (v) {
+                  final q = v.text.trim();
+                  if (q.isEmpty) return const Iterable<String>.empty();
+                  return _partyNames.where((n) => n.contains(q) && n != q).take(6);
+                },
+                onSelected: (_) => _touch(),
+                fieldViewBuilder: (c, ctl, fn, _) => TextField(
+                  controller: ctl,
+                  focusNode: fn,
+                  onChanged: (_) => _touch(),
+                  decoration: const InputDecoration(labelText: 'اسم العميل / المورد'),
+                ),
+                optionsViewBuilder: (c, onSel, opts) => Align(
+                  alignment: AlignmentDirectional.topStart,
+                  child: Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 240, maxWidth: 420),
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        children: [
+                          for (final o in opts)
+                            ListTile(title: Text(o), onTap: () => onSel(o)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 10),
               TextField(

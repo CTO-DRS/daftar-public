@@ -33,6 +33,14 @@ class SettingsService {
   String get companyName => _p.getString('company_name') ?? '';
   set companyName(String v) => _p.setString('company_name', v.trim());
 
+  /// ترقيم الفواتير: بادئة (مثل INV-)، أول رقم، عدد الخانات.
+  String get numberPrefix => _p.getString('num_prefix') ?? '';
+  set numberPrefix(String v) => _p.setString('num_prefix', v.trim());
+  int get numberStart => _p.getInt('num_start') ?? 1;
+  set numberStart(int v) => _p.setInt('num_start', v < 1 ? 1 : v);
+  int get numberPadding => _p.getInt('num_padding') ?? 1;
+  set numberPadding(int v) => _p.setInt('num_padding', v.clamp(1, 8));
+
   bool get arabicDigits => _p.getBool('arabic_digits') ?? false;
   set arabicDigits(bool v) => _p.setBool('arabic_digits', v);
 

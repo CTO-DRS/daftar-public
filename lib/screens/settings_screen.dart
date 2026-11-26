@@ -17,6 +17,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final _currency = TextEditingController(text: s.currency);
   late final _gModel = TextEditingController(text: s.geminiModel);
   late final _oModel = TextEditingController(text: s.openrouterModel);
+  late final _prefix = TextEditingController(text: s.numberPrefix);
+  late final _start = TextEditingController(text: '${s.numberStart}');
+  late final _pad = TextEditingController(text: '${s.numberPadding}');
   late OcrProvider _provider = s.provider;
   bool _hide = true;
   bool _arabicDigits = SettingsService.instance.arabicDigits;
@@ -28,6 +31,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     s.geminiModel = _gModel.text.isEmpty ? 'gemini-2.5-flash' : _gModel.text;
     s.openrouterModel =
         _oModel.text.isEmpty ? 'google/gemini-2.5-flash' : _oModel.text;
+    s.numberPrefix = _prefix.text;
+    s.numberStart = parseNumber(_start.text)?.toInt() ?? 1;
+    s.numberPadding = parseNumber(_pad.text)?.toInt() ?? 1;
     s.provider = _provider;
     s.arabicDigits = _arabicDigits;
     useArabicDigits = _arabicDigits;
@@ -51,6 +57,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
         TextField(
             controller: _currency,
             decoration: const InputDecoration(labelText: 'رمز العملة')),
+        const SizedBox(height: 24),
+        const Text('ترقيم الفواتير', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+              child: TextField(
+                  controller: _prefix,
+                  textDirection: TextDirection.ltr,
+                  decoration: const InputDecoration(labelText: 'البادئة (مثل INV-)'))),
+          const SizedBox(width: 8),
+          Expanded(
+              child: TextField(
+                  controller: _start,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'أول رقم'))),
+          const SizedBox(width: 8),
+          Expanded(
+              child: TextField(
+                  controller: _pad,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'عدد الخانات'))),
+        ]),
+        const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('عرض الأرقام بالهندية (١٢٣)'),

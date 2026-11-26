@@ -5,6 +5,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
 import '../models/invoice_item.dart';
+import '../models/party.dart';
+import '../services/settings_service.dart';
 
 /// قاعدة بيانات SQLite المحلية (تعمل بدون إنترنت).
 class AppDatabase {
@@ -14,6 +16,15 @@ class AppDatabase {
   Database? _db;
 
   Future<Database> get db async => _db ??= await _open();
+
+  static const _partiesDdl = '''
+    CREATE TABLE IF NOT EXISTS parties(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      phone TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT ''
+    )''';
 
   static bool get isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -31,8 +42,11 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 2,
+      version: 3,
       onUpgrade: (d, o, n) async {
+        if (o < 3) {
+          await d.execute(_partiesDdl);
+        }
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
         }
@@ -65,6 +79,7 @@ class AppDatabase {
             unit_price REAL NOT NULL DEFAULT 0,
             notes TEXT NOT NULL DEFAULT ''
           )''');
+        await d.execute(_partiesDdl);
         await d.execute('CREATE INDEX idx_items_invoice ON items(invoice_id, position)');
       },
       ),
@@ -148,16 +163,20 @@ class AppDatabase {
     return saveInvoice(copy);
   }
 
-  /// الرقم التالي: أكبر رقم عددي موجود + 1.
+  /// الرقم التالي حسب إعدادات الترقيم: بادئة + رقم متسلسل بعدد خانات ثابت.
   Future<String> nextNumber() async {
     final d = await db;
+    final st = SettingsService.instance;
+    final prefix = st.numberPrefix;
     final rows = await d.query('invoices', columns: ['number']);
-    var max = 0;
+    var max = st.numberStart - 1;
     for (final r in rows) {
-      final n = int.tryParse((r['number'] as String).trim());
-      if (n != null && n > max) max = n;
+      final n = (r['number'] as String).trim();
+      if (!n.startsWith(prefix)) continue;
+      final v = int.tryParse(n.substring(prefix.length));
+      if (v != null && v > max) max = v;
     }
-    return '${max + 1}';
+    return formatInvoiceNumber(prefix, max + 1, st.numberPadding);
   }
 }
 
@@ -185,5 +204,53 @@ extension CatalogQueries on AppDatabase {
           unitPrice: (m['unit_price'] as num?)?.toDouble() ?? 0,
         )
     };
+  }
+}
+
+String formatInvoiceNumber(String prefix, int n, int padding) =>
+    '$prefix${n.toString().padLeft(padding, '0')}';
+
+extension PartyQueries on AppDatabase {
+  Future<List<PartySummary>> listParties({String query = ''}) async {
+    final d = await db;
+    final q = query.trim();
+    final rows = await d.query('parties',
+        where: q.isEmpty ? null : 'name LIKE ? OR phone LIKE ?',
+        whereArgs: q.isEmpty ? null : ['%$q%', '%$q%'],
+        orderBy: 'name COLLATE NOCASE');
+    final out = <PartySummary>[];
+    for (final m in rows) {
+      final p = Party.fromMap(m);
+      final agg = await d.rawQuery(
+          'SELECT COUNT(*) c, COALESCE(SUM(grand_total),0) t FROM invoices WHERE party = ?',
+          [p.name]);
+      out.add(PartySummary(p, (agg.first['c'] as int?) ?? 0,
+          (agg.first['t'] as num?)?.toDouble() ?? 0));
+    }
+    return out;
+  }
+
+  Future<void> saveParty(Party p) async {
+    final d = await db;
+    final m = p.toMap()..remove('id');
+    if (p.id == null) {
+      p.id = await d.insert('parties', m, conflictAlgorithm: ConflictAlgorithm.replace);
+    } else {
+      await d.update('parties', m, where: 'id = ?', whereArgs: [p.id]);
+    }
+  }
+
+  Future<void> deleteParty(int id) async {
+    final d = await db;
+    await d.delete('parties', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// أسماء العملاء: المحفوظون أولاً ثم الأسماء السابقة في الفواتير.
+  Future<List<String>> partyNames() async {
+    final d = await db;
+    final saved = (await d.query('parties', columns: ['name'], orderBy: 'name COLLATE NOCASE'))
+        .map((e) => e['name'] as String);
+    final used = await knownParties();
+    return {...saved, ...used}.toList();
   }
 }
