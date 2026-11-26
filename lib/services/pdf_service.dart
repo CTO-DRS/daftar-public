@@ -28,6 +28,7 @@ class PdfService {
     String partyAddress = '',
   }) async {
     await _loadFonts();
+    final items = inv.items.where((e) => !e.isEmpty).toList();
     final theme = pw.ThemeData.withFont(base: _regular!, bold: _bold!);
     final doc = pw.Document(
       title: '${inv.kind.label} ${inv.number}',
@@ -50,8 +51,8 @@ class PdfService {
       'م',
     ];
     final data = <List<String>>[];
-    for (var i = 0; i < inv.items.length; i++) {
-      final it = inv.items[i];
+    for (var i = 0; i < items.length; i++) {
+      final it = items[i];
       data.add([
         it.notes,
         formatMoney(it.total),

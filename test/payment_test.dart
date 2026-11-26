@@ -3,6 +3,7 @@ import 'package:daftar/models/invoice_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  emptyRowTests();
   Invoice mk({InvoiceStatus st = InvoiceStatus.confirmed, double paid = 0, DateTime? due}) =>
       Invoice(number: '1', status: st, paidAmount: paid, dueDate: due, items: [
         InvoiceItem(quantity: 2, unitPrice: 50),
@@ -29,5 +30,18 @@ void main() {
     final i = Invoice.fromMap(mk(paid: 30, due: due).toMap());
     expect(i.paidAmount, 30);
     expect(i.dueDate, due);
+  });
+}
+
+void emptyRowTests() {
+  test('empty rows are detected and not counted', () {
+    final inv = Invoice(number: '1', items: [
+      InvoiceItem(),
+      InvoiceItem(description: 'x', quantity: 2, unitPrice: 5),
+      InvoiceItem(quantity: 3),
+    ]);
+    expect(inv.items[0].isEmpty, isTrue);
+    expect(inv.items[2].isEmpty, isFalse);
+    expect(inv.itemCount, 2);
   });
 }

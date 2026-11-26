@@ -59,7 +59,7 @@ class Invoice {
         items = items ?? [];
 
   /// إجمالي عدد الأصناف (عدد الأسطر).
-  int get itemCount => items.length;
+  int get itemCount => items.where((e) => !e.isEmpty).length;
 
   /// إجمالي القطع.
   double get totalQuantity => items.fold(0.0, (s, i) => s + i.quantity);

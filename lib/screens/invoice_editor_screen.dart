@@ -142,7 +142,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   }
 
   InvoiceItem _blank() => InvoiceItem(
-        quantity: 1,
+        quantity: 0,
         unitPrice: _pinPrice ? _pinnedPrice : 0,
         description: _pinType ? _pinnedType : '',
       );

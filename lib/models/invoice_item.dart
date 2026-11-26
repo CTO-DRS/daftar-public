@@ -31,6 +31,15 @@ class InvoiceItem {
   /// الإجمالي = العدد × سعر الفردي.
   double get total => quantity * unitPrice;
 
+  /// سطر فارغ تماماً: يُحذف تلقائياً عند الحفظ.
+  bool get isEmpty =>
+      itemCode.trim().isEmpty &&
+      refNumber.trim().isEmpty &&
+      description.trim().isEmpty &&
+      notes.trim().isEmpty &&
+      quantity == 0 &&
+      unitPrice == 0;
+
   InvoiceItem copy() => InvoiceItem(
         id: id,
         invoiceId: invoiceId,

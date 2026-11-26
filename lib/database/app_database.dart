@@ -127,6 +127,7 @@ class AppDatabase {
   Future<int> saveInvoice(Invoice inv) async {
     final d = await db;
     inv.updatedAt = DateTime.now();
+    inv.items.removeWhere((e) => e.isEmpty);
     return d.transaction((txn) async {
       int id;
       final map = inv.toMap()..remove('id');
