@@ -65,6 +65,38 @@ class PdfService {
       ]);
     }
 
+    const totalFill = PdfColor.fromInt(0xFFCCFBF1);
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(2.2), // ملاحظات
+      1: const pw.FlexColumnWidth(1.6), // الإجمالي
+      2: const pw.FlexColumnWidth(1.4), // الفردي
+      3: const pw.FlexColumnWidth(1.0), // العدد
+      4: const pw.FlexColumnWidth(3.0), // النوع
+      5: const pw.FlexColumnWidth(1.5), // المرجع
+      6: const pw.FlexColumnWidth(1.5), // الكود
+      7: const pw.FixedColumnWidth(26), // م
+    };
+
+    pw.Widget totalCard() => pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: pw.BoxDecoration(
+            color: totalFill,
+            border: pw.Border.all(color: headerColor, width: 1.2),
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Column(children: [
+            pw.Text('المبلغ الإجمالي',
+                style: const pw.TextStyle(
+                    fontSize: 9, color: PdfColors.grey700)),
+            pw.SizedBox(height: 2),
+            pw.Text('${formatMoney(inv.grandTotal)} $currency',
+                style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                    color: headerColor)),
+          ]),
+        );
+
     pw.Widget summary() => pw.Container(
           padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: pw.BoxDecoration(
@@ -181,6 +213,12 @@ class PdfService {
           ),
         ]),
         build: (ctx) => [
+          if (data.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 8),
+              child: pw.Align(
+                  alignment: pw.Alignment.centerLeft, child: totalCard()),
+            ),
           if (data.isEmpty)
             pw.Center(child: pw.Text('لا توجد أصناف'))
           else
@@ -203,16 +241,35 @@ class PdfService {
                 0: pw.Alignment.centerRight,
                 4: pw.Alignment.centerRight,
               },
-              columnWidths: {
-                0: const pw.FlexColumnWidth(2.2), // ملاحظات
-                1: const pw.FlexColumnWidth(1.6), // الإجمالي
-                2: const pw.FlexColumnWidth(1.4), // الفردي
-                3: const pw.FlexColumnWidth(1.0), // العدد
-                4: const pw.FlexColumnWidth(3.0), // النوع
-                5: const pw.FlexColumnWidth(1.5), // المرجع
-                6: const pw.FlexColumnWidth(1.5), // الكود
-                7: const pw.FixedColumnWidth(26), // م
-              },
+              columnWidths: colWidths,
+            ),
+          if (data.isNotEmpty)
+            pw.TableHelper.fromTextArray(
+              data: [
+                [
+                  '',
+                  formatMoney(inv.grandTotal),
+                  '',
+                  formatQty(inv.totalQuantity),
+                  'الإجمالي',
+                  '',
+                  '',
+                  '',
+                ]
+              ],
+              border: pw.TableBorder.all(color: headerColor, width: .8),
+              cellStyle: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                  color: headerColor),
+              headerCount: 0,
+              oddRowDecoration: const pw.BoxDecoration(color: totalFill),
+              rowDecoration: const pw.BoxDecoration(color: totalFill),
+              cellPadding:
+                  const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+              cellAlignment: pw.Alignment.center,
+              cellAlignments: {4: pw.Alignment.centerRight},
+              columnWidths: colWidths,
             ),
         ],
       ),
