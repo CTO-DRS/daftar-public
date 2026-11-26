@@ -179,7 +179,7 @@ class PdfService {
             children: [
               pw.Text('عدد الأصناف: ${localizeDigits('${inv.itemCount}')}',
                   style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
-              pw.Text('إجمالي القطع: ${formatQty(inv.totalQuantity)}',
+              pw.Text('العدد الكلي: ${formatQty(inv.totalQuantity)}',
                   style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
               pw.Text('المبلغ الإجمالي: ${formatMoney(inv.grandTotal)} $currency',
                   style: pw.TextStyle(

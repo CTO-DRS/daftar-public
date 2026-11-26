@@ -45,7 +45,7 @@ class TotalsBar extends StatelessWidget {
             Row(children: [
             _Stat(label: 'الأصناف', value: localizeDigits('$itemCount')),
             _divider(),
-            _Stat(label: 'القطع', value: formatQty(totalQty)),
+            _Stat(label: 'العدد الكلي', value: formatQty(totalQty)),
             _divider(),
             Expanded(
               flex: 2,

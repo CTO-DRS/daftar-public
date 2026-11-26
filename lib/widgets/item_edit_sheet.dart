@@ -60,7 +60,11 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       text: widget.item.unitPrice == 0 ? '' : plainNumber(widget.item.unitPrice));
   late final _notes = TextEditingController(text: widget.item.notes);
   late final _unit = TextEditingController(text: widget.item.unit);
-  static const _unitPresets = ['حبة', 'عدد', 'كرتون', 'درزن', 'كجم', 'جم', 'متر', 'سم', 'لتر', 'ساعة', 'يوم', 'خدمة'];
+  static const _unitPresets = [
+    'عدد', 'حبة', 'درزن', 'كرتون', 'علبة', 'باكت', 'كيس', 'صندوق', 'رزمة', 'حزمة', 'لفة', 'طقم',
+    'زجاجة', 'قارورة', 'برميل', 'جالون', 'كجم', 'جم', 'طن', 'رطل', 'أونصة', 'لتر', 'مل',
+    'متر', 'سم', 'متر مربع', 'إنش', 'قدم', 'ياردة', 'ساعة', 'يوم', 'خدمة',
+  ];
   late bool _pinPrice = widget.pinPrice;
   late bool _pinType = widget.pinType;
 
