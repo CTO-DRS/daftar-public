@@ -5,3 +5,16 @@
 -dontwarn com.google.mlkit.vision.text.korean.**
 -dontwarn com.google.mlkit.vision.text.**
 -dontwarn com.yalantis.ucrop.**
+
+# ML Kit's native OCR pipeline looks up Java classes/methods by name over JNI,
+# and its components are discovered by reflection. R8 renaming/stripping them
+# makes the scan fail in release builds with a NullPointerException.
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-keep class com.google.android.gms.vision.** { *; }
+-keep class com.google.android.odml.** { *; }
+-keep class com.google_mlkit_commons.** { *; }
+-keep class com.google_mlkit_text_recognition.** { *; }
+-keep class com.google.firebase.components.** { *; }
+-keep class * implements com.google.firebase.components.ComponentRegistrar { *; }
+-keepclasseswithmembernames class * { native <methods>; }
