@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
+import '../utils/recurrence.dart';
 import '../models/invoice_item.dart';
 import '../models/party.dart';
 import '../services/settings_service.dart';
@@ -24,6 +25,15 @@ class AppDatabase {
       phone TEXT NOT NULL DEFAULT '',
       address TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT ''
+    )''';
+
+  static const _recurringDdl = '''
+    CREATE TABLE IF NOT EXISTS recurring(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER NOT NULL,
+      every TEXT NOT NULL,
+      next_date INTEGER NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1
     )''';
 
   static bool get isDesktop =>
@@ -63,6 +73,7 @@ class AppDatabase {
           await d.execute('ALTER TABLE invoices ADD COLUMN vat_rate REAL NOT NULL DEFAULT 0');
         }
         if (o < 7) {
+          await d.execute(_recurringDdl);
           await d.execute("ALTER TABLE invoices ADD COLUMN note_type TEXT NOT NULL DEFAULT ''");
           await d.execute("ALTER TABLE invoices ADD COLUMN ref_number TEXT NOT NULL DEFAULT ''");
         }
@@ -102,6 +113,7 @@ class AppDatabase {
             notes TEXT NOT NULL DEFAULT ''
           )''');
         await d.execute(_partiesDdl);
+        await d.execute(_recurringDdl);
         await d.execute('CREATE INDEX idx_items_invoice ON items(invoice_id, position)');
       },
       ),
@@ -210,6 +222,73 @@ class AppDatabase {
     return saveInvoice(note);
   }
 
+  Future<void> addRecurring(int invoiceId, Recurrence every, DateTime next) async {
+    final d = await db;
+    await d.insert('recurring', {
+      'invoice_id': invoiceId,
+      'every': every.name,
+      'next_date': next.millisecondsSinceEpoch,
+      'active': 1,
+    });
+  }
+
+  Future<void> deleteRecurring(int id) async {
+    final d = await db;
+    await d.delete('recurring', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<RecurringInfo>> listRecurring() async {
+    final d = await db;
+    final r = await d.rawQuery('''
+      SELECT r.id, r.every, r.next_date, i.number, i.party
+      FROM recurring r JOIN invoices i ON i.id = r.invoice_id
+      ORDER BY r.next_date ASC''');
+    return r
+        .map((m) => RecurringInfo(
+              id: m['id'] as int,
+              every: RecurrenceX.fromDb(m['every'] as String?),
+              next: DateTime.fromMillisecondsSinceEpoch(m['next_date'] as int),
+              number: m['number'] as String,
+              party: m['party'] as String,
+            ))
+        .toList();
+  }
+
+  /// ينشئ مسودات للفواتير الدورية المستحقة (عند فتح التطبيق). يعيد عدد المسودات.
+  /// تُحذف القوالب التي حُذفت فاتورتها الأصلية. أقصى 3 مسودات فائتة لكل قالب.
+  Future<int> generateDueRecurring(DateTime now) async {
+    final d = await db;
+    await d.execute(
+        'DELETE FROM recurring WHERE invoice_id NOT IN (SELECT id FROM invoices)');
+    final rows = await d.query('recurring',
+        where: 'active = 1 AND next_date <= ?',
+        whereArgs: [now.millisecondsSinceEpoch]);
+    var created = 0;
+    for (final r in rows) {
+      var next = DateTime.fromMillisecondsSinceEpoch(r['next_date'] as int);
+      final every = RecurrenceX.fromDb(r['every'] as String?);
+      final src = await getInvoice(r['invoice_id'] as int);
+      if (src == null) continue;
+      final offset = src.dueDate?.difference(src.date);
+      var made = 0;
+      while (!next.isAfter(now)) {
+        if (made < 3) {
+          final id = await duplicateInvoice(src.id!);
+          final c = (await getInvoice(id))!;
+          c.date = next;
+          c.dueDate = offset == null ? null : next.add(offset);
+          await saveInvoice(c);
+          made++;
+          created++;
+        }
+        next = nextOccurrence(next, every);
+      }
+      await d.update('recurring', {'next_date': next.millisecondsSinceEpoch},
+          where: 'id = ?', whereArgs: [r['id']]);
+    }
+    return created;
+  }
+
   /// الرقم التالي حسب إعدادات الترقيم: بادئة + رقم متسلسل بعدد خانات ثابت.
   Future<String> nextNumber([DocKind kind = DocKind.invoice, String? prefix]) async {
     final d = await db;
@@ -310,4 +389,18 @@ extension PartyQueries on AppDatabase {
     final used = await knownParties();
     return {...saved, ...used}.toList();
   }
+}
+
+class RecurringInfo {
+  final int id;
+  final Recurrence every;
+  final DateTime next;
+  final String number;
+  final String party;
+  RecurringInfo(
+      {required this.id,
+      required this.every,
+      required this.next,
+      required this.number,
+      required this.party});
 }

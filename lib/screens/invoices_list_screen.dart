@@ -13,6 +13,8 @@ import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
+import 'recurring_screen.dart';
+import '../utils/recurrence.dart';
 import 'settings_screen.dart';
 
 /// الشاشة الرئيسية: قائمة الفواتير وجداول الجرد.
@@ -53,6 +55,41 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
   void initState() {
     super.initState();
     _load();
+    _runRecurring();
+  }
+
+  Future<void> _runRecurring() async {
+    final n = await AppDatabase.instance.generateDueRecurring(DateTime.now());
+    if (n > 0 && mounted) {
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('أُنشئت $n مسودة من الفواتير الدورية، راجعها قبل الإرسال')));
+    }
+  }
+
+  Future<void> _makeRecurring(Invoice inv) async {
+    final every = await showModalBottomSheet<Recurrence>(
+      context: context,
+      builder: (c) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const ListTile(
+            title: Text('تكرار هذه الفاتورة',
+                style: TextStyle(fontWeight: FontWeight.w800))),
+        for (final r in Recurrence.values)
+          ListTile(title: Text(r.label), onTap: () => Navigator.pop(c, r)),
+      ])),
+    );
+    if (every == null) return;
+    var first = nextOccurrence(inv.date, every);
+    while (!first.isAfter(DateTime.now())) {
+      first = nextOccurrence(first, every);
+    }
+    await AppDatabase.instance.addRecurring(inv.id!, every, first);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('تم. ستُنشأ مسودة ${every.label} وأول موعد ${formatDate(first)}')));
+    await _runRecurring();
   }
 
   @override
@@ -133,6 +170,12 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       appBar: AppBar(
         title: const Text('دفتر'),
         actions: [
+          IconButton(
+            tooltip: 'الفواتير الدورية',
+            icon: const Icon(Icons.autorenew),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const RecurringScreen())),
+          ),
           IconButton(
             tooltip: 'العملاء والموردون',
             icon: const Icon(Icons.people_outline),
@@ -258,6 +301,8 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                             final n = await AppDatabase.instance
                                                 .getInvoice(id);
                                             if (n != null) _open(n);
+                                          } else if (v == 'recur') {
+                                            _makeRecurring(inv);
                                           } else if (v == 'dup') {
                                             await AppDatabase.instance
                                                 .duplicateInvoice(inv.id!);
@@ -281,6 +326,10 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                                 value: 'debit',
                                                 child: Text('إشعار مدين (زيادة)')),
                                           ],
+                                          if (inv.kind == DocKind.invoice && !inv.isNote)
+                                            const PopupMenuItem(
+                                                value: 'recur',
+                                                child: Text('جعلها دورية')),
                                           const PopupMenuItem(
                                               value: 'dup', child: Text('نسخ')),
                                           const PopupMenuItem(
