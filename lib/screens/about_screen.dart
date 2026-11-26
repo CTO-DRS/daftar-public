@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_info.dart';
@@ -404,6 +407,24 @@ Future<void> showLinkSheet(BuildContext context, DevLink l) {
               ),
             ),
           ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: _GlassButton(
+                icon: Icons.ios_share,
+                label: 'مشاركة الرابط',
+                onTap: () => SharePlus.instance.share(ShareParams(text: l.url, subject: l.label)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _GlassButton(
+                icon: Icons.qr_code_2,
+                label: 'مشاركة QR',
+                onTap: () => shareQrImage(l),
+              ),
+            ),
+          ]),
         ]),
       ),
       ),
@@ -437,4 +458,50 @@ class _GlassSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _GlassButton extends StatelessWidget {
+  const _GlassButton({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: const Color(0x14FFFFFF),
+            side: const BorderSide(color: Color(0x30FFFFFF)),
+            minimumSize: const Size(0, 44)),
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: const TextStyle(fontSize: 13)),
+      );
+}
+
+/// يرسم رمز QR على الجهاز (بدون شبكة) ويشاركه كصورة PNG.
+Future<void> shareQrImage(DevLink l) async {
+  final painter = QrPainter(
+    data: l.url,
+    version: QrVersions.auto,
+    gapless: false,
+    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF000000)),
+    dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF000000)),
+  );
+  final data = await painter.toImageData(1024, format: ui.ImageByteFormat.png);
+  if (data == null) return;
+  // خلفية بيضاء مع هامش: QrPainter شفاف افتراضياً.
+  final rec = ui.PictureRecorder();
+  final c = Canvas(rec);
+  const size = 1280.0;
+  c.drawRect(const Rect.fromLTWH(0, 0, size, size), Paint()..color = const Color(0xFFFFFFFF));
+  final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+  final frame = await codec.getNextFrame();
+  c.drawImage(frame.image, const Offset(128, 128), Paint());
+  final img = await rec.endRecording().toImage(size.toInt(), size.toInt());
+  final png = await img.toByteData(format: ui.ImageByteFormat.png);
+  if (png == null) return;
+  final dir = await getTemporaryDirectory();
+  final f = File('${dir.path}/qr_${l.label.replaceAll(RegExp(r'[^A-Za-z0-9]'), '')}_${l.url.hashCode.abs()}.png');
+  await f.writeAsBytes(png.buffer.asUint8List(), flush: true);
+  await SharePlus.instance.share(ShareParams(files: [XFile(f.path, mimeType: 'image/png')], text: l.url));
 }
