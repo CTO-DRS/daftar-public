@@ -46,13 +46,15 @@ jobs:
         timeout-minutes: 25
         env:
           DAFTAR_KEYSTORE_PASSWORD: ${{ secrets.DAFTAR_KEYSTORE_PASSWORD }}
-        run: flutter build apk --release -v
+        run: flutter build apk --release --split-per-abi --target-platform android-arm64,android-arm -v
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -106,7 +108,8 @@ jobs:
       - name: Name the files with the version
         run: |
           V="${GITHUB_REF_NAME}"
-          mv dist/app-release.apk "dist/Daftar-${V}.apk"
+          mv dist/app-arm64-v8a-release.apk "dist/Daftar-${V}.apk"
+          mv dist/app-armeabi-v7a-release.apk "dist/Daftar-${V}-32bit.apk"
           mv dist/daftar-windows-x64.zip "dist/Daftar-${V}-windows-x64.zip"
       - uses: softprops/action-gh-release@v2
         with:
