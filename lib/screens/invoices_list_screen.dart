@@ -193,6 +193,30 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                     Text('${formatMoney(s.grandTotal)} $cur',
                                         style: const TextStyle(
                                             fontWeight: FontWeight.w800)),
+                                    if (inv.kind == DocKind.invoice &&
+                                        s.grandTotal > 0)
+                                      Builder(builder: (_) {
+                                        final rem = paymentRemaining(
+                                            s.grandTotal,
+                                            inv.paidAmount,
+                                            inv.status);
+                                        final overdue = isOverdueFor(inv.kind,
+                                            inv.dueDate, rem, s.grandTotal);
+                                        if (rem <= 0.005) {
+                                          return Text('مسددة',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.green.shade700));
+                                        }
+                                        return Text(
+                                            '${overdue ? 'متأخرة · ' : ''}متبقي ${formatMoney(rem)}',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: overdue
+                                                    ? Colors.red.shade700
+                                                    : Colors.orange.shade800));
+                                      }),
                                     SizedBox(
                                       height: 40,
                                       child: PopupMenuButton<String>(

@@ -38,6 +38,8 @@ class Invoice {
   String party; // اسم العميل / المورد
   String notes;
   DateTime updatedAt;
+  DateTime? dueDate; // تاريخ الاستحقاق
+  double paidAmount; // المبلغ المدفوع
   List<InvoiceItem> items;
 
   Invoice({
@@ -49,6 +51,8 @@ class Invoice {
     this.party = '',
     this.notes = '',
     DateTime? updatedAt,
+    this.dueDate,
+    this.paidAmount = 0,
     List<InvoiceItem>? items,
   })  : date = date ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
@@ -63,6 +67,14 @@ class Invoice {
   /// المبلغ الإجمالي النهائي.
   double get grandTotal => items.fold(0.0, (s, i) => s + i.total);
 
+  /// المتبقي بعد الدفعات.
+  double get remaining => paymentRemaining(grandTotal, paidAmount, status);
+
+  bool get isFullyPaid => remaining <= 0.005;
+
+  /// متأخرة: فاتورة لها تاريخ استحقاق مضى وما زال عليها متبقٍ.
+  bool get isOverdue => isOverdueFor(kind, dueDate, remaining, grandTotal);
+
   Map<String, Object?> toMap() => {
         'id': id,
         'kind': kind.dbValue,
@@ -72,6 +84,8 @@ class Invoice {
         'party': party,
         'notes': notes,
         'updated_at': updatedAt.millisecondsSinceEpoch,
+        'due_date': dueDate?.millisecondsSinceEpoch,
+        'paid_amount': paidAmount,
         'item_count': itemCount,
         'total_qty': totalQuantity,
         'grand_total': grandTotal,
@@ -88,6 +102,10 @@ class Invoice {
         notes: (m['notes'] as String?) ?? '',
         updatedAt:
             DateTime.fromMillisecondsSinceEpoch((m['updated_at'] as int?) ?? 0),
+        dueDate: m['due_date'] == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(m['due_date'] as int),
+        paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
         items: items,
       );
 }
@@ -99,4 +117,20 @@ class InvoiceSummary {
   final double totalQty;
   final double grandTotal;
   InvoiceSummary(this.invoice, this.itemCount, this.totalQty, this.grandTotal);
+}
+
+/// المتبقي: الفاتورة بحالة "مدفوعة" تُعدّ مسددة بالكامل حتى لو لم يُسجَّل مبلغ.
+double paymentRemaining(double total, double paid, InvoiceStatus status) {
+  if (status == InvoiceStatus.paid) return 0;
+  final r = total - paid;
+  return r < 0 ? 0 : r;
+}
+
+bool isOverdueFor(DocKind kind, DateTime? due, double remaining, double total,
+    [DateTime? now]) {
+  if (kind != DocKind.invoice || due == null || total <= 0) return false;
+  if (remaining <= 0.005) return false;
+  final n = now ?? DateTime.now();
+  final today = DateTime(n.year, n.month, n.day);
+  return DateTime(due.year, due.month, due.day).isBefore(today);
 }

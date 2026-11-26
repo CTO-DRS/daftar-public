@@ -42,13 +42,19 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 3,
+      version: 4,
       onUpgrade: (d, o, n) async {
+        if (o < 2) {
+          await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
+        }
         if (o < 3) {
           await d.execute(_partiesDdl);
         }
-        if (o < 2) {
-          await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
+        if (o < 4) {
+          await d.execute('ALTER TABLE invoices ADD COLUMN due_date INTEGER');
+          await d.execute('ALTER TABLE invoices ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0');
+          // الفواتير المدفوعة سابقاً تُسجَّل كمسددة بالكامل.
+          await d.execute("UPDATE invoices SET paid_amount = grand_total WHERE status = 'paid'");
         }
       },
       onConfigure: (d) => d.execute('PRAGMA foreign_keys = ON'),
@@ -63,6 +69,8 @@ class AppDatabase {
             party TEXT NOT NULL DEFAULT '',
             notes TEXT NOT NULL DEFAULT '',
             updated_at INTEGER NOT NULL,
+            due_date INTEGER,
+            paid_amount REAL NOT NULL DEFAULT 0,
             item_count INTEGER NOT NULL DEFAULT 0,
             total_qty REAL NOT NULL DEFAULT 0,
             grand_total REAL NOT NULL DEFAULT 0

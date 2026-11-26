@@ -117,7 +117,10 @@ class PdfService {
                 pw.Text(
                     'اسم العميل / المورد: ${inv.party.isEmpty ? '-' : inv.party}',
                     style: const pw.TextStyle(fontSize: 12)),
-                pw.Text('التاريخ: ${formatDate(inv.date)}   |   الحالة: ${inv.status.label}',
+                pw.Text(
+                    'التاريخ: ${formatDate(inv.date)}'
+                    '${inv.kind == DocKind.invoice && inv.dueDate != null ? '   |   الاستحقاق: ${formatDate(inv.dueDate!)}' : ''}'
+                    '   |   الحالة: ${inv.status.label}',
                     style: const pw.TextStyle(fontSize: 12)),
               ],
             ),
@@ -134,6 +137,20 @@ class PdfService {
         footer: (ctx) => pw.Column(children: [
           pw.Divider(thickness: .5, color: PdfColors.grey500),
           summary(),
+          if (inv.kind == DocKind.invoice && inv.paidAmount > 0 && !inv.isFullyPaid)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 3),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('المدفوع: ${formatMoney(inv.paidAmount)} $currency',
+                      style: const pw.TextStyle(fontSize: 11)),
+                  pw.Text('المتبقي: ${formatMoney(inv.remaining)} $currency',
+                      style: pw.TextStyle(
+                          fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            ),
           pw.SizedBox(height: 4),
           pw.Align(
             alignment: pw.Alignment.center,

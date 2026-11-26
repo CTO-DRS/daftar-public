@@ -38,6 +38,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   final _number = TextEditingController();
   final _party = TextEditingController();
   final _notes = TextEditingController();
+  final _paid = TextEditingController();
   final _filter = TextEditingController();
   final _partyFocus = FocusNode();
 
@@ -74,13 +75,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _number.text = inv.number;
     _party.text = inv.party;
     _notes.text = inv.notes;
+    _paid.text = _paidText(inv.status == InvoiceStatus.paid ? inv.grandTotal : inv.paidAmount);
     if (!mounted) return;
     setState(() => _inv = inv);
   }
 
   @override
   void dispose() {
-    for (final c in [_number, _party, _notes, _filter]) {
+    for (final c in [_number, _party, _notes, _paid, _filter]) {
       c.dispose();
     }
     _partyFocus.dispose();
@@ -94,6 +96,35 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     inv.number = _number.text.trim().isEmpty ? inv.number : _number.text.trim();
     inv.party = _party.text.trim();
     inv.notes = _notes.text.trim();
+    if (inv.status == InvoiceStatus.paid) inv.paidAmount = inv.grandTotal;
+  }
+
+  String _paidText(double v) => v == 0 ? '' : formatQty(v);
+
+  void _onPaidChanged(String t) {
+    final inv = _inv!;
+    final v = parseNumber(t) ?? 0;
+    inv.paidAmount = v < 0 ? 0 : v;
+    if (inv.grandTotal > 0 && inv.paidAmount >= inv.grandTotal - 0.005) {
+      inv.status = InvoiceStatus.paid;
+    } else if (inv.status == InvoiceStatus.paid) {
+      inv.status = InvoiceStatus.confirmed;
+    }
+    _touch();
+  }
+
+  Future<void> _pickDue() async {
+    final inv = _inv!;
+    final d = await showDatePicker(
+      context: context,
+      initialDate: inv.dueDate ?? inv.date.add(const Duration(days: 30)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (d != null) {
+      setState(() => inv.dueDate = d);
+      _touch();
+    }
   }
 
   Future<bool> _save({bool quiet = false}) async {
@@ -472,7 +503,16 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                       label: Text(st.label),
                       selected: inv.status == st,
                       onSelected: (_) {
-                        setState(() => inv.status = st);
+                        setState(() {
+                          final wasPaid = inv.status == InvoiceStatus.paid;
+                          inv.status = st;
+                          if (st == InvoiceStatus.paid) {
+                            inv.paidAmount = inv.grandTotal;
+                          } else if (wasPaid) {
+                            inv.paidAmount = 0;
+                          }
+                          _paid.text = _paidText(inv.paidAmount);
+                        });
                         _touch();
                       },
                     ),
@@ -513,6 +553,56 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   ),
                 ),
               ),
+              if (inv.kind == DocKind.invoice) ...[
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: _pickDue,
+                        onLongPress: inv.dueDate == null
+                            ? null
+                            : () {
+                                setState(() => inv.dueDate = null);
+                                _touch();
+                              },
+                        icon: const Icon(Icons.event_busy),
+                        label: Text(inv.dueDate == null
+                            ? 'تاريخ الاستحقاق'
+                            : 'الاستحقاق: ${formatDate(inv.dueDate!)}'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _paid,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: _onPaidChanged,
+                      decoration: InputDecoration(
+                          labelText: 'المدفوع', suffixText: _cur),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    inv.isOverdue
+                        ? 'متأخرة - المتبقي ${formatMoney(inv.remaining)} $_cur'
+                        : 'المتبقي ${formatMoney(inv.remaining)} $_cur',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: inv.isOverdue
+                            ? Colors.red.shade700
+                            : inv.isFullyPaid
+                                ? Colors.green.shade700
+                                : null),
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               TextField(
                 controller: _notes,
