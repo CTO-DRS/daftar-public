@@ -3,6 +3,7 @@ name: Build APK
 on:
   push:
     branches: ['**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -85,3 +86,29 @@ jobs:
           path: daftar-windows-x64.zip
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-release
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: daftar-windows-x64
+          path: dist
+      - name: Name the files with the version
+        run: |
+          V="${GITHUB_REF_NAME}"
+          mv dist/app-release.apk "dist/Daftar-${V}.apk"
+          mv dist/daftar-windows-x64.zip "dist/Daftar-${V}-windows-x64.zip"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
