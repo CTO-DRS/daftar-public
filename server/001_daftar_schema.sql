@@ -59,3 +59,5 @@ grant execute on function daftar.open_share(text) to anon, authenticated;
 
 grant usage on schema daftar to authenticated, anon;
 grant select, insert, update, delete on daftar.records, daftar.shares to authenticated;
+
+create unique index if not exists shares_one_per_invoice on daftar.shares (user_id, invoice_id);

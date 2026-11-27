@@ -39,9 +39,14 @@ class SyncService {
 
   final http.Client _c;
   final String _url, _key;
+  String get baseUrl => _url;
+  String get anonKey => _key;
+  http.Client get client => _c;
   bool _busy = false;
 
   bool get enabled => SettingsService.instance.syncRefresh.isNotEmpty;
+
+  Map<String, String> headers([String? token, String? profile, bool write = false]) => _h(token, profile, write);
 
   Map<String, String> _h([String? token, String? profile, bool write = false]) => <String, String>{
         'apikey': _key,
@@ -95,6 +100,10 @@ class SyncService {
     s.syncCursor = '';
     s.syncPushTs = 0;
   }
+
+  /// للاستخدام الخارجي (روابط المشاركة): توكن صالح ومعرّفات uid مضمونة.
+  Future<String> accessToken() => _token();
+  Future<void> ensureUids() async => _assignUids(await AppDatabase.instance.db);
 
   Future<String> _token() async {
     final s = SettingsService.instance;

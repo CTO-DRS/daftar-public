@@ -14,6 +14,7 @@ import 'invoice_editor_screen.dart';
 import 'quick_invoice_screen.dart';
 import '../utils/followup.dart';
 import '../services/sync_service.dart';
+import '../services/share_service.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'insights_screen.dart';
@@ -36,6 +37,8 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
   final _search = TextEditingController();
   List<InvoiceSummary> _items = [];
   List<InvoiceSummary> _followUps = [];
+  Map<String, ShareView> _views = {};
+  Map<int, String> _uids = {};
   bool _loading = true;
   DashboardStats? _stats;
 
@@ -150,6 +153,46 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       final r = await SyncService.instance.sync();
       if (r.pulled + r.deleted > 0 && mounted) _load();
     } catch (_) {}
+    _loadViews();
+  }
+
+  String _viewLabel(Invoice inv) {
+    final v = _views[_uids[inv.id]];
+    if (v == null) return '';
+    if (v.views == 0) return '  |  أُرسل الرابط، لم يُفتح بعد';
+    final w = v.last == null ? '' : ' ${formatDate(v.last!)}';
+    return '  |  👁 شاهدها العميل$w (${localizeDigits('${v.views}')})';
+  }
+
+  Future<void> _loadViews() async {
+    if (!SyncService.instance.enabled) return;
+    final v = await ShareService.instance.views();
+    final u = await ShareService.instance.uidsById();
+    if (!mounted) return;
+    setState(() {
+      _views = v;
+      _uids = u;
+    });
+  }
+
+  Future<void> _shareLink(Invoice inv) async {
+    final msg = ScaffoldMessenger.of(context);
+    try {
+      final full = await AppDatabase.instance.getInvoice(inv.id!);
+      if (full == null) return;
+      final url = await ShareService.instance.link(full);
+      final party = await AppDatabase.instance.partyByName(inv.party);
+      final text = 'السلام عليكم ${inv.party.isEmpty ? '' : inv.party}\n'
+          'فاتورتكم رقم ${localizeDigits(inv.number)}:\n$url'
+          '${SettingsService.instance.companyName.isEmpty ? '' : '\n${SettingsService.instance.companyName}'}';
+      _loadViews();
+      final ok = await launchUrl(waUri(waPhone(party?.phone ?? ''), text),
+              mode: LaunchMode.externalApplication)
+          .catchError((_) => false);
+      if (!ok) await Share.share(text);
+    } on SyncException catch (e) {
+      msg.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   Future<void> _load() async {
@@ -416,7 +459,8 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${inv.status.label}  |  ${formatDate(inv.date)}  |  ${localizeDigits('${s.itemCount}')} صنف  |  ${formatQty(s.totalQty)} قطعة',
+                                        '${inv.status.label}  |  ${formatDate(inv.date)}  |  ${localizeDigits('${s.itemCount}')} صنف  |  ${formatQty(s.totalQty)} قطعة'
+                                        '${_viewLabel(inv)}',
                                         style: TextStyle(
                                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             fontSize: 13),
@@ -463,6 +507,8 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                             _delete(s);
                                           } else if (v == 'remind') {
                                             _remind(s);
+                                          } else if (v == 'link') {
+                                            _shareLink(inv);
                                           } else if (v == 'credit' || v == 'debit') {
                                             final id = await AppDatabase.instance
                                                 .createNote(inv.id!, v);
@@ -490,6 +536,10 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                             const PopupMenuItem(
                                                 value: 'remind',
                                                 child: Text('تذكير بالسداد (واتساب)')),
+                                          if (inv.kind == DocKind.invoice && !inv.isNote)
+                                            const PopupMenuItem(
+                                                value: 'link',
+                                                child: Text('إرسال رابط للعميل (مع حالة المشاهدة)')),
                                           if (inv.kind == DocKind.invoice && !inv.isNote) ...const [
                                             PopupMenuItem(
                                                 value: 'credit',
