@@ -280,6 +280,69 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
+  /// تبويبات الصفحات: الكل | ص1 | ص2 | + صفحة. تظهر عند استخدام الصفحات اليدوية،
+  /// وقبلها زر «تقسيم إلى صفحات» يفعّلها.
+  Widget _pageTabs() {
+    final c = _c!;
+    if (c.inv.items.where((e) => !e.isEmpty).isEmpty && !c.manualPages) {
+      return const SizedBox.shrink();
+    }
+    if (!c.manualPages && c.pageTab == 0) {
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+          child: ActionChip(
+            key: const ValueKey('enable-pages'),
+            avatar: const Icon(Icons.layers_outlined, size: 18),
+            label: const Text('تقسيم إلى صفحات'),
+            onPressed: () {
+              c.materializePages();
+              c.selectPageTab(1);
+              _touch();
+            },
+          ),
+        ),
+      );
+    }
+    final pages = {...c.pages, if (c.pageTab > 0) c.pageTab}.toList()..sort();
+    final next = (pages.isEmpty ? 0 : pages.last) + 1;
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 8),
+            child: ChoiceChip(
+              key: const ValueKey('tab-all'),
+              label: const Text('الكل'),
+              selected: c.pageTab == 0,
+              onSelected: (_) => c.selectPageTab(0),
+            ),
+          ),
+          for (final n in pages)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: ChoiceChip(
+                key: ValueKey('tab-$n'),
+                label: Text('ص${localizeDigits('$n')}'),
+                selected: c.pageTab == n,
+                onSelected: (_) => c.selectPageTab(n),
+              ),
+            ),
+          ActionChip(
+            key: const ValueKey('tab-new'),
+            avatar: const Icon(Icons.add, size: 18),
+            label: const Text('صفحة'),
+            onPressed: () => c.selectPageTab(next),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// نقل سطر إلى صفحة معينة بضغطة واحدة (أو صفحة جديدة).
   Future<void> _movePageSheet(InvoiceItem it) async {
     final c = _c!;
@@ -522,6 +585,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             child: Column(children: [
           _header(inv),
           _toolbar(),
+          _pageTabs(),
           Expanded(
             child: inv.items.isEmpty
                 ? const EmptyState(
@@ -529,7 +593,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                     hint: 'اضغط «إضافة سطر» لإدخال أول صنف.',
                     badge: Icons.playlist_add)
                 : visible.isEmpty
-                    ? const Center(child: Text('لا نتائج مطابقة'))
+                    ? Center(
+                        child: Text(_c!.pageTab > 0
+                            ? 'هذه الصفحة فارغة. اضغط «إضافة سطر» لتضع فيها أصنافاً.'
+                            : 'لا نتائج مطابقة'))
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                         itemCount: visible.length,

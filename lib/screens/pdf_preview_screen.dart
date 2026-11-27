@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import '../widgets/pdf_pages_view.dart';
 
 import '../database/app_database.dart';
 import '../models/invoice.dart';
@@ -78,8 +79,9 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
           final bytes = snap.data!;
           return ContentWidth(maxWidth: 1000, child: Column(children: [
             Expanded(
-              child: PdfPreview(
+              child: PdfPreview.builder(
                 build: (_) async => bytes,
+                pagesBuilder: (context, pages) => PdfPagesView(pages: pages),
                 pdfFileName: _fileName,
                 canChangeOrientation: false,
                 canChangePageFormat: false,
