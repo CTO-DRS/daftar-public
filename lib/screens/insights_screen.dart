@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../database/app_database.dart';
 import '../services/settings_service.dart';
 import '../utils/insights.dart';
+import '../utils/forecast.dart';
 import '../utils/number_utils.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/responsive.dart';
@@ -20,6 +21,7 @@ class InsightsScreen extends StatefulWidget {
 class _InsightsScreenState extends State<InsightsScreen> {
   InsightsReport? _r;
   ProfitSummary? _today, _month;
+  List<StockForecast> _stock = [];
 
   @override
   void initState() {
@@ -38,8 +40,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
         .profitSince(DateTime(now.year, now.month, now.day), currency: cur);
     final month = await AppDatabase.instance
         .profitSince(DateTime(now.year, now.month), currency: cur);
+    final stock = await AppDatabase.instance.stockForecast(now);
     if (mounted) {
       setState(() {
+        _stock = stock;
         _r = r;
         _today = today;
         _month = month;
@@ -70,6 +74,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   if (r.customers.isNotEmpty) ...[
                     _Section('العملاء ومخاطر السداد', Icons.groups_2_outlined),
                     for (final c in r.customers.take(8)) _CustomerTile(c),
+                  ],
+                  if (_stock.isNotEmpty) ...[
+                    _Section('المخزون المتوقع', Icons.inventory_2_outlined),
+                    for (final f in _stock.take(8)) _StockTile(f),
                   ],
                   if (r.products.isNotEmpty) ...[
                     _Section('أفضل الأصناف إيراداً', Icons.workspace_premium_outlined),
@@ -373,6 +381,32 @@ class _ProfitCard extends StatelessWidget {
                     color: Theme.of(context).colorScheme.outline)),
           ],
         ]),
+      ),
+    );
+  }
+}
+
+class _StockTile extends StatelessWidget {
+  final StockForecast f;
+  const _StockTile(this.f);
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final days = f.daysLeft;
+    final low = days != null && days <= 7;
+    final order = f.suggestedOrder();
+    return Card(
+      child: ListTile(
+        leading: Icon(low ? Icons.warning_amber_rounded : Icons.inventory_2_outlined,
+            color: low ? cs.error : cs.primary),
+        title: Text(f.name),
+        subtitle: Text(
+            'المتبقي تقديرياً ${formatQty(f.onHand < 0 ? 0 : f.onHand)} • يُباع ${formatQty(double.parse(f.perDay.toStringAsFixed(1)))} باليوم'
+            '${order > 0 ? '\nيقترح شراء ${formatQty(order)} لتغطية 30 يوماً' : ''}'),
+        trailing: Text(
+            days == null ? '' : (days < 1 ? 'نفد' : 'يكفي ${localizeDigits(days.floor().toString())} يوم'),
+            style: TextStyle(fontWeight: FontWeight.w800, color: low ? cs.error : null)),
+        isThreeLine: order > 0,
       ),
     );
   }

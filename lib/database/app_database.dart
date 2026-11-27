@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
+import '../utils/forecast.dart';
 import '../utils/insights.dart';
 import '../utils/pricing.dart';
 import '../utils/recurrence.dart';
@@ -231,6 +232,32 @@ class AppDatabase {
     final m = rows.first;
     double n(String k) => (m[k] as num?)?.toDouble() ?? 0;
     return ProfitSummary(n('sales'), n('costed_sales'), n('profit'), (m['docs'] as num?)?.toInt() ?? 0);
+  }
+
+  /// توقع نفاد المخزون: آخر جرد لكل صنف ناقص مبيعاته بعده.
+  Future<List<StockForecast>> stockForecast(DateTime now) async {
+    final d = await db;
+    final c = await d.rawQuery('''
+      SELECT LOWER(TRIM(i.description)) AS k, TRIM(i.description) AS name,
+             (i.quantity + i.wholesale_qty * CASE WHEN i.pack_size > 0 THEN i.pack_size ELSE 1 END) AS qty,
+             v.date AS date
+      FROM items i JOIN invoices v ON v.id = i.invoice_id
+      WHERE v.kind = 'inventory' AND TRIM(i.description) != ''
+    ''');
+    final s = await d.rawQuery('''
+      SELECT LOWER(TRIM(i.description)) AS k,
+             (CASE WHEN v.note_type = 'credit' THEN -1 ELSE 1 END) *
+             (i.quantity + i.wholesale_qty * CASE WHEN i.pack_size > 0 THEN i.pack_size ELSE 1 END) AS pieces,
+             v.date AS date
+      FROM items i JOIN invoices v ON v.id = i.invoice_id
+      WHERE v.kind = 'invoice' AND v.status != 'draft' AND TRIM(i.description) != ''
+    ''');
+    DateTime dt(Object? v) => DateTime.fromMillisecondsSinceEpoch((v as int?) ?? 0);
+    return computeStockForecast(
+      [for (final m in c) CountRow(m['k'] as String, m['name'] as String, (m['qty'] as num).toDouble(), dt(m['date']))],
+      [for (final m in s) SaleRow(m['k'] as String, (m['pieces'] as num).toDouble(), dt(m['date']))],
+      now,
+    );
   }
 
   /// قائمة الفواتير مع إمكانية البحث بالرقم أو اسم العميل.
