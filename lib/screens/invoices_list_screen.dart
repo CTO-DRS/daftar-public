@@ -241,6 +241,22 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
           ),
           ListTile(
             minTileHeight: 56,
+            leading: const Icon(Icons.payments_outlined),
+            title: const Text('مصروف جديد'),
+            onTap: () => Navigator.pop(c, DocKind.expense),
+          ),
+          ListTile(
+            minTileHeight: 56,
+            leading: const Icon(Icons.document_scanner_outlined),
+            title: const Text('مسح إيصال مصروف'),
+            onTap: () async {
+              Navigator.pop(c);
+              final saved = await startScanFlow(context, kind: DocKind.expense);
+              if (saved) _load();
+            },
+          ),
+          ListTile(
+            minTileHeight: 56,
             leading: const Icon(Icons.request_quote_outlined),
             title: const Text('عرض سعر جديد'),
             onTap: () => Navigator.pop(c, DocKind.quote),
@@ -440,6 +456,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                   child: Icon(switch (inv.kind) {
                                     DocKind.invoice => Icons.receipt_long,
                                     DocKind.quote => Icons.request_quote_outlined,
+                                    DocKind.expense => Icons.payments_outlined,
                                     DocKind.inventory => Icons.inventory_2_outlined,
                                   }),
                                 ),

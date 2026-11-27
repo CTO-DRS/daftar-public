@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/invoice.dart';
 import '../services/ocr_service.dart';
 import '../utils/platform_utils.dart';
 import 'scan_verification_screen.dart';
 
 /// مسار المسح: التقاط/اختيار صورة، قص وتدوير، ثم شاشة المراجعة.
 /// يعيد true إذا اعتمد المستخدم الفاتورة وحُفظت.
-Future<bool> startScanFlow(BuildContext context) async {
+Future<bool> startScanFlow(BuildContext context, {DocKind kind = DocKind.invoice}) async {
   final source = !isMobilePlatform
       ? ImageSource.gallery
       : await showModalBottomSheet<ImageSource>(
@@ -67,7 +68,7 @@ Future<bool> startScanFlow(BuildContext context) async {
     // تحسين التباين وتصغير الحجم قبل المعالجة.
     final processed = await OcrService.preprocess(File(cropped.path));
     final saved = await nav.push<bool>(MaterialPageRoute(
-        builder: (_) => ScanVerificationScreen(image: processed)));
+        builder: (_) => ScanVerificationScreen(image: processed, kind: kind)));
     return saved ?? false;
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('تعذر فتح الصورة: $e')));

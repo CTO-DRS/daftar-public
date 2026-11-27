@@ -16,7 +16,8 @@ import '../widgets/totals_bar.dart';
 /// شاشة المراجعة: الصورة في النصف العلوي والجدول المستخرج القابل للتعديل في السفلي.
 class ScanVerificationScreen extends StatefulWidget {
   final File image;
-  const ScanVerificationScreen({super.key, required this.image});
+  final DocKind kind;
+  const ScanVerificationScreen({super.key, required this.image, this.kind = DocKind.invoice});
 
   @override
   State<ScanVerificationScreen> createState() => _ScanVerificationScreenState();
@@ -111,7 +112,8 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
     setState(() => _saving = true);
     final db = AppDatabase.instance;
     final inv = Invoice(
-      number: _number.text.trim().isEmpty ? await db.nextNumber() : _number.text.trim(),
+      kind: widget.kind,
+      number: _number.text.trim().isEmpty ? await db.nextNumber(widget.kind) : _number.text.trim(),
       date: _result?.date,
       party: _party.text.trim(),
       items: _items.map((e) => e.copy()..flagged = false..id = null).toList(),

@@ -253,6 +253,17 @@ class AppDatabase {
     return ProfitSummary(n('sales'), n('costed_sales'), n('profit'), (m['docs'] as num?)?.toInt() ?? 0);
   }
 
+  /// مجموع المصروفات منذ [from] (كل مستندات المصروف المسجّلة).
+  Future<double> expensesSince(DateTime from, {String currency = ''}) async {
+    final d = await db;
+    final r = await d.rawQuery('''
+      SELECT SUM(grand_total) AS t FROM invoices
+      WHERE kind = 'expense' AND date >= ?
+        AND (? = '' OR currency = '' OR currency = ?)
+    ''', [from.millisecondsSinceEpoch, currency, currency]);
+    return (r.first['t'] as num?)?.toDouble() ?? 0;
+  }
+
   /// توقع نفاد المخزون: آخر جرد لكل صنف ناقص مبيعاته بعده.
   Future<List<StockForecast>> stockForecast(DateTime now) async {
     final d = await db;
@@ -544,6 +555,7 @@ class AppDatabase {
     prefix ??= switch (kind) {
       DocKind.inventory => st.inventoryPrefix,
       DocKind.quote => 'QT-',
+      DocKind.expense => 'EXP-',
       DocKind.invoice => st.numberPrefix,
     };
     final rows = await d.query('invoices', columns: ['number']);

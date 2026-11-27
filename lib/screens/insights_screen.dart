@@ -21,6 +21,7 @@ class InsightsScreen extends StatefulWidget {
 class _InsightsScreenState extends State<InsightsScreen> {
   InsightsReport? _r;
   ProfitSummary? _today, _month;
+  double _expMonth = 0;
   List<StockForecast> _stock = [];
 
   @override
@@ -40,6 +41,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
         .profitSince(DateTime(now.year, now.month, now.day), currency: cur);
     final month = await AppDatabase.instance
         .profitSince(DateTime(now.year, now.month), currency: cur);
+    final exp = await AppDatabase.instance.expensesSince(DateTime(now.year, now.month), currency: cur);
     final stock = await AppDatabase.instance.stockForecast(now);
     if (mounted) {
       setState(() {
@@ -47,6 +49,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
         _r = r;
         _today = today;
         _month = month;
+        _expMonth = exp;
       });
     }
   }
@@ -66,7 +69,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               : ContentWidth(
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
                   _Alerts(r.alerts),
-                  if (_today != null && _month != null) _ProfitCard(_today!, _month!),
+                  if (_today != null && _month != null) _ProfitCard(_today!, _month!, _expMonth),
                   _Section('توقع التحصيل', Icons.event_available_outlined),
                   _ForecastGrid(r.forecast),
                   _Section('أعمار الديون', Icons.timelapse),
@@ -334,7 +337,8 @@ class _Products extends StatelessWidget {
 
 class _ProfitCard extends StatelessWidget {
   final ProfitSummary today, month;
-  const _ProfitCard(this.today, this.month);
+  final double expenses;
+  const _ProfitCard(this.today, this.month, this.expenses);
 
   Widget _col(BuildContext c, String title, ProfitSummary p) {
     final cs = Theme.of(c).colorScheme;
@@ -372,6 +376,20 @@ class _ProfitCard extends StatelessWidget {
             _col(context, 'اليوم', today),
             _col(context, 'هذا الشهر', month),
           ]),
+          if (expenses > 0) ...[
+            const Divider(height: 20),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text('مصروفات الشهر: ${formatMoney(expenses)}',
+                  style: const TextStyle(fontSize: 13)),
+              if (month.hasCosts)
+                Text('الصافي: ${formatMoney(month.profit - expenses)}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: month.profit - expenses >= 0
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.error)),
+            ]),
+          ],
           if (noCost) ...[
             const SizedBox(height: 10),
             Text(
