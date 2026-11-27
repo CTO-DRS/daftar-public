@@ -157,6 +157,37 @@ class PdfService {
     return doc.save();
   }
 
+  /// عبارة توثيق المصدر: أسطر نصها كما اعتمده المطور، تُطبع في آخر صفحة فقط.
+  static const issuedByLines = <String>[
+    'تم إصدار هذه الفاتورة إلكترونيًا بواسطة تطبيق دفتر',
+    'دفتر | لإدارة الفواتير والحسابات',
+    'تطوير وبرمجة: رشيد الحداد',
+    '© جميع الحقوق محفوظة لتطبيق دفتر.',
+  ];
+
+  /// الفواتير والإشعارات فقط (عرض السعر والجرد والمصروف ليست فواتير صادرة).
+  static bool showsIssuedBy(Invoice inv) => inv.kind == DocKind.invoice;
+
+  static pw.Widget _issuedByBlock() => pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 18),
+        child: pw.Column(children: [
+          pw.Divider(thickness: .5, color: PdfColors.grey500, height: 6),
+          pw.SizedBox(height: 4),
+          pw.Text(issuedByLines[0],
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+          pw.Text(issuedByLines[1],
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700, fontWeight: pw.FontWeight.bold)),
+          pw.Text(issuedByLines[2],
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+          pw.Text(issuedByLines[3],
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600)),
+        ]),
+      );
+
   static pw.Widget _srow(String a, String b, {bool bold = false, PdfColor? color}) => pw.Padding(
         padding: const pw.EdgeInsets.symmetric(vertical: 2),
         child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
@@ -505,6 +536,7 @@ class PdfService {
         build: (ctx) => [
           if (data.isEmpty) pw.Center(child: pw.Text('لا توجد أصناف')) else table(),
           if (data.isNotEmpty) pw.Wrap(children: [summarySection()]),
+          if (showsIssuedBy(inv)) _issuedByBlock(),
         ],
       ),
     );

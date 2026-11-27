@@ -49,4 +49,44 @@ void main() {
       if (out != null) File('$out-${t.name}.pdf').writeAsBytesSync(bytes);
     }
   });
+
+  test('issued-by footer: exact text, last page only, invoices only', () async {
+    expect(PdfService.issuedByLines, [
+      'تم إصدار هذه الفاتورة إلكترونيًا بواسطة تطبيق دفتر',
+      'دفتر | لإدارة الفواتير والحسابات',
+      'تطوير وبرمجة: رشيد الحداد',
+      '© جميع الحقوق محفوظة لتطبيق دفتر.',
+    ]);
+    expect(PdfService.showsIssuedBy(Invoice(number: '1')), isTrue);
+    expect(PdfService.showsIssuedBy(Invoice(number: '1', noteType: 'credit')), isTrue);
+    expect(PdfService.showsIssuedBy(Invoice(number: '1', kind: DocKind.quote)), isFalse);
+    expect(PdfService.showsIssuedBy(Invoice(number: '1', kind: DocKind.inventory)), isFalse);
+    expect(PdfService.showsIssuedBy(Invoice(number: '1', kind: DocKind.expense)), isFalse);
+
+    // نص الصفحات عبر pdftotext إن توفر (يتخطى الاختبار بصمت إن لم يتوفر).
+    final has = (await Process.run('which', ['pdftotext'])).exitCode == 0;
+    if (!has) return;
+    Future<List<String>> pages(Invoice inv, PdfTemplate t) async {
+      final bytes = await PdfService.build(inv, company: 'شركة', template: t);
+      final f = File('${Directory.systemTemp.path}/issued_${inv.items.length}_${t.name}.pdf')
+        ..writeAsBytesSync(bytes);
+      final r = await Process.run('pdftotext', ['-layout', f.path, '-']);
+      return (r.stdout as String).split('\f').where((p) => p.trim().isNotEmpty).toList();
+    }
+    // pdftotext يعيد أشكال العرض (presentation forms) لا الحروف الأصلية.
+    bool has1(String p) => p.contains('\uFE8D\uFEDF\uFEA4\uFEAA\uFE8D\uFEA9');
+    for (final t in PdfTemplate.values) {
+      final big = Invoice(number: '9', items: List.generate(
+          60, (i) => InvoiceItem(description: 'صنف $i', quantity: 2, unitPrice: 3)));
+      final pg = await pages(big, t);
+      expect(pg.length, greaterThan(1), reason: t.name);
+      expect(pg.where(has1).length, 1, reason: '${t.name}: exactly one page');
+      expect(has1(pg.last), isTrue, reason: '${t.name}: last page');
+      final one = await pages(Invoice(number: '1', items: [InvoiceItem(description: 'x', quantity: 1, unitPrice: 1)]), t);
+      expect(one.length, 1);
+      expect(has1(one.single), isTrue);
+      final q = await pages(Invoice(number: '2', kind: DocKind.quote, items: [InvoiceItem(description: 'x', quantity: 1, unitPrice: 1)]), t);
+      expect(q.any(has1), isFalse);
+    }
+  });
 }
