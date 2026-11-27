@@ -19,6 +19,7 @@ import '../utils/forecast.dart';
 import '../utils/reorder.dart';
 import '../utils/collection.dart';
 import 'ask_screen.dart';
+import '../utils/digest.dart';
 import '../utils/customer_defaults.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
@@ -42,6 +43,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
   final _search = TextEditingController();
   List<InvoiceSummary> _items = [];
   List<CollectionCase> _collect = [];
+  WeeklyDigest? _digest;
   Map<String, ShareView> _views = {};
   List<StockForecast> _low = [];
   List<ReorderDue> _reorder = [];
@@ -301,9 +303,11 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
         .where((e) => e.daysLeft != null && e.daysLeft! <= 7)
         .toList();
     final ro = reorderDue(all, DateTime.now(), snoozed: SettingsService.instance.reorderSnooze);
+    final digest = buildDigest(all, await AppDatabase.instance.soldRows(), DateTime.now());
     if (!mounted) return;
     setState(() {
       _reorder = ro;
+      _digest = digest;
       _collect = buildCollection(all, DateTime.now(), SettingsService.instance.reminded);
       _low = low;
       _stats = stats;
@@ -526,6 +530,25 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                 trailing: const Icon(Icons.chevron_left),
                 onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const InsightsScreen())),
+              ),
+            ),
+          ),
+        if (_digest != null && !_digest!.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Card(
+              key: const ValueKey('weekly-digest'),
+              child: ExpansionTile(
+                leading: const Icon(Icons.insights_outlined),
+                title: const Text('ملخص الأسبوع', style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text(_digest!.headline),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final l in _digest!.lines)
+                    Padding(padding: const EdgeInsets.only(top: 4), child: Text(l)),
+                  if (_digest!.lines.isEmpty) const Text('لا شيء يحتاج انتباهك هذا الأسبوع.'),
+                ],
               ),
             ),
           ),
