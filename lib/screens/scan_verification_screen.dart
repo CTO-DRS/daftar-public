@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../database/app_database.dart';
 import '../models/invoice.dart';
 import '../utils/auto_fill.dart';
+import '../utils/smart_items.dart';
+import '../utils/customer_defaults.dart';
 import '../models/invoice_item.dart';
 import '../models/ocr_result.dart';
 import '../services/ocr_service.dart';
@@ -29,6 +31,9 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
   List<InvoiceItem> _items = [];
   String? _error;
   bool _saving = false;
+  int _smart = 0;
+  List<ItemStat> _stats = [];
+  Map<String, double> _cprices = {};
   final _party = TextEditingController();
   final _number = TextEditingController();
 
@@ -54,11 +59,20 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
       final r = await OcrService().scan(widget.image);
       if (!mounted) return;
       final db = AppDatabase.instance;
-      if (widget.kind != DocKind.expense) {
-        enrichItems(r.items, await db.itemHistory());
-      }
       final known = await db.partyNames();
       _party.text = matchParty(r.party, known) ?? r.party;
+      var smart = 0;
+      if (widget.kind != DocKind.expense) {
+        final hist = await db.itemHistory();
+        smart += snapItemNames(r.items, hist.keys.toList());
+        if (known.contains(_party.text)) {
+          smart += applyCustomerPrices(r.items, await db.customerPrices(_party.text));
+        }
+        smart += enrichItems(r.items, hist);
+      }
+      _smart = smart;
+      _stats = await db.itemStats();
+      _cprices = await db.customerPrices(_party.text);
       _number.text = r.invoiceNumber.isNotEmpty
           ? r.invoiceNumber
           : await AppDatabase.instance.nextNumber();
@@ -77,7 +91,8 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
 
   Future<void> _edit(InvoiceItem it) async {
     final r = await showItemEditSheet(context,
-        item: it, isNew: false, pinPrice: false, pinType: false);
+        item: it, isNew: false, pinPrice: false, pinType: false,
+        stats: _stats, customerPrices: _cprices, others: _items);
     if (r == null) return;
     setState(() {
       final i = _items.indexOf(it);
@@ -91,7 +106,10 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
         item: InvoiceItem(quantity: 1),
         isNew: true,
         pinPrice: false,
-        pinType: false);
+        pinType: false,
+        stats: _stats,
+        customerPrices: _cprices,
+        others: _items);
     if (r == null) return;
     setState(() => _items.add(r.item));
   }
@@ -124,6 +142,15 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
       party: _party.text.trim(),
       items: _items.map((e) => e.copy()..flagged = false..id = null).toList(),
     );
+    if (widget.kind == DocKind.invoice && inv.party.isNotEmpty) {
+      final d = computeDefaults(await db.recentInvoicesForParty(inv.party));
+      if (d.dueDays != null) {
+        inv.dueDate = DateTime(inv.date.year, inv.date.month, inv.date.day)
+            .add(Duration(days: d.dueDays!));
+      }
+      if (d.vatRate != null) inv.vatRate = d.vatRate!;
+      if (d.currency != null) inv.currency = d.currency!;
+    }
     await db.saveInvoice(inv);
     if (mounted) Navigator.pop(context, true);
   }
@@ -229,9 +256,10 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
           ),
         ]),
       ),
-      if (r.warnings.isNotEmpty || mismatch || _flaggedCount > 0)
+      if (r.warnings.isNotEmpty || mismatch || _flaggedCount > 0 || _smart > 0)
         _banner([
           'المصدر: ${r.source.label}',
+          if (_smart > 0) 'أُكمل $_smart تلقائياً من سجلّك (أسماء/أسعار). راجعها قبل الاعتماد.',
           ...r.warnings,
           if (mismatch)
             'إجمالي الورقة (${formatMoney(stated)}) لا يطابق مجموع الصفوف (${formatMoney(_sum)}).',

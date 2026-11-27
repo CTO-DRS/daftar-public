@@ -80,3 +80,31 @@ int enrichItems(List<InvoiceItem> items, Map<String, InvoiceItem> history) {
 
 /// تطبيع عربي للمطابقة (همزات، تشكيل، ة/ه، ى/ي، مسافات).
 String normArabic(String s) => _n(s);
+
+/// يصحّح أسماء الأصناف المقروءة (OCR) إلى أسماء معروفة عند تطابق واضح فقط
+/// (نفس الاسم بعد التطبيع أو خطأ حرف واحد). يعيد عدد ما صُحّح فعلاً.
+int snapItemNames(List<InvoiceItem> items, List<String> known) {
+  var n = 0;
+  for (final it in items) {
+    final hit = matchParty(it.description, known);
+    if (hit != null && hit != it.description) {
+      it.description = hit;
+      n++;
+    }
+  }
+  return n;
+}
+
+/// يملأ سعر الوحدة الفارغ من آخر سعر لهذا العميل (مفتاح: الاسم المطبّع). يعيد العدد.
+int applyCustomerPrices(List<InvoiceItem> items, Map<String, double> prices) {
+  var n = 0;
+  for (final it in items) {
+    if (it.unitPrice != 0) continue;
+    final p = prices[_n(it.description)];
+    if (p != null && p > 0) {
+      it.unitPrice = p;
+      n++;
+    }
+  }
+  return n;
+}
