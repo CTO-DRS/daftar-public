@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
 import '../utils/price_hints.dart';
+import '../utils/nl_query.dart';
 import '../utils/forecast.dart';
 import '../utils/quote_split.dart';
 import '../utils/insights.dart';
@@ -622,6 +623,33 @@ extension CatalogQueries on AppDatabase {
       for (final m in r)
         ItemStat(InvoiceItem.fromMap(m), (m['cnt'] as num?)?.toInt() ?? 1)
     ];
+  }
+
+  /// كل أسطر مبيعات الفواتير (للأسئلة الصوتية والنصية).
+  Future<List<SoldRow>> soldRows() async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT i.*, v.party AS vparty, v.date AS vdate FROM items i JOIN invoices v ON v.id = i.invoice_id "
+        "WHERE v.kind = 'invoice' AND v.note_type = '' AND TRIM(i.description) != ''");
+    return [
+      for (final m in r)
+        () {
+          final it = InvoiceItem.fromMap(m);
+          return SoldRow(it.description.trim(), it.pieces, it.total, DateTime.fromMillisecondsSinceEpoch((m['vdate'] as num).toInt()), (m['vparty'] as String?) ?? '');
+        }()
+    ];
+  }
+
+  /// يسجّل دفعة على فاتورة: يزيد المدفوع ويُعلّمها مدفوعة عند اكتمال السداد.
+  Future<void> addPaymentTo(int invoiceId, double amount) async {
+    final inv = await getInvoice(invoiceId);
+    if (inv == null || amount <= 0) return;
+    inv.paidAmount = (inv.paidAmount + amount).clamp(0, inv.grandTotal).toDouble();
+    if (inv.grandTotal - inv.paidAmount <= 0.005) {
+      inv.paidAmount = inv.grandTotal;
+      inv.status = InvoiceStatus.paid;
+    }
+    await saveInvoice(inv);
   }
 
   /// تاريخ أسعار كل صنف (بالاسم المطبّع) من الأقدم للأحدث، آخر [perItem] نقطة لكل صنف.

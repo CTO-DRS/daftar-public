@@ -18,6 +18,7 @@ import '../services/auto_backup.dart';
 import '../utils/forecast.dart';
 import '../utils/reorder.dart';
 import '../utils/collection.dart';
+import 'ask_screen.dart';
 import '../utils/customer_defaults.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
@@ -472,6 +473,13 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       appBar: AppBar(
         title: const Text('دفتر'),
         actions: [
+          IconButton(
+            key: const ValueKey('open-ask'),
+            tooltip: 'اسأل دفتر',
+            icon: const Icon(Icons.auto_awesome),
+            onPressed: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const AskScreen())),
+          ),
           IconButton(
             tooltip: 'الذكاء المالي',
             icon: const Icon(Icons.psychology_outlined),
