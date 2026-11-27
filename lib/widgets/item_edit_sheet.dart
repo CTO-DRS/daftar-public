@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../screens/barcode_scan_screen.dart';
+import '../utils/platform_utils.dart';
 
 import '../database/app_database.dart';
 import '../models/invoice_item.dart';
@@ -206,7 +208,25 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                       _fromCatalog(v);
                       _loadTiers();
                     },
-                    decoration: const InputDecoration(labelText: 'كود الصنف'))),
+                    decoration: InputDecoration(
+                        labelText: 'كود الصنف',
+                        suffixIcon: isMobilePlatform
+                            ? IconButton(
+                                tooltip: 'مسح باركود',
+                                icon: const Icon(Icons.qr_code_scanner),
+                                onPressed: () async {
+                                  final v = await Navigator.push<String>(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              const BarcodeScanScreen()));
+                                  if (v == null || !mounted) return;
+                                  setState(() => _code.text = v);
+                                  _fromCatalog(v);
+                                  _loadTiers();
+                                },
+                              )
+                            : null))),
             const SizedBox(width: 10),
             Expanded(
                 child: TextField(
