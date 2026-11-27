@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../models/invoice.dart';
 import '../utils/price_hints.dart';
 import '../utils/nl_query.dart';
+import '../utils/duplicates.dart';
 import '../utils/forecast.dart';
 import '../utils/quote_split.dart';
 import '../utils/insights.dart';
@@ -417,7 +418,7 @@ class AppDatabase {
   }
 
   /// سجل حذف للمزامنة (فقط لما سبق رفعه أي له uid).
-  Future<void> _tomb(Database d, String entity, String? uid) async {
+  Future<void> _tomb(DatabaseExecutor d, String entity, String? uid) async {
     if (uid == null || uid.isEmpty) return;
     await d.insert('tombstones',
         {'entity': entity, 'uid': uid, 'ts': DateTime.now().millisecondsSinceEpoch},
@@ -837,6 +838,135 @@ extension PartyQueries on AppDatabase {
     }
   }
 
+  /// العملاء (المحفوظون والمذكورون في الفواتير) مع جوالهم وعدد فواتيرهم، لكشف التكرار.
+  Future<List<DupEntry>> partyDupEntries() async {
+    final d = await db;
+    final saved = await d.query('parties', columns: ['name', 'phone']);
+    final used = await d.rawQuery(
+        "SELECT party, COUNT(*) c FROM invoices WHERE TRIM(party) != '' GROUP BY party");
+    final phones = {for (final m in saved) (m['name'] as String): (m['phone'] as String?) ?? ''};
+    final counts = {for (final m in used) (m['party'] as String): (m['c'] as num).toInt()};
+    return [
+      for (final name in {...phones.keys, ...counts.keys})
+        DupEntry(name, phone: phones[name] ?? '', count: counts[name] ?? 0)
+    ];
+  }
+
+  /// الأصناف بالاسم المكتوب مع كودها وعدد استخدامها.
+  Future<List<DupEntry>> itemDupEntries() async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT description, MAX(item_code) code, COUNT(*) c FROM items "
+        "WHERE TRIM(description) != '' GROUP BY description");
+    return [
+      for (final m in r)
+        DupEntry(m['description'] as String, code: (m['code'] as String?) ?? '', count: (m['c'] as num).toInt())
+    ];
+  }
+
+  /// يدمج عملاء مكررين في [keep]: ينقل فواتيرهم، يكمل جوال/عنوان المُبقى، ويحذف المكررين.
+  /// يعيد حالة تراجع كاملة.
+  Future<MergeUndo> mergeParties(String keep, List<String> from) async {
+    final d = await db;
+    final undo = MergeUndo();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final src = from.where((e) => e != keep).toList();
+    if (src.isEmpty) return undo;
+    final ph = List.filled(src.length, '?').join(',');
+    final removed = await d.query('parties', where: 'name IN ($ph)', whereArgs: src);
+    final keepRows = await d.query('parties', where: 'name = ?', whereArgs: [keep]);
+    final inv = await d.query('invoices',
+        columns: ['id', 'party', 'updated_at'], where: 'party IN ($ph)', whereArgs: src);
+    await d.transaction((t) async {
+      for (final m in inv) {
+        undo.invoices.add(Map.of(m));
+        await t.update('invoices', {'party': keep, 'updated_at': now}, where: 'id = ?', whereArgs: [m['id']]);
+      }
+      if (keepRows.isNotEmpty) {
+        undo.partyBefore = Map.of(keepRows.first);
+        final upd = <String, Object?>{};
+        for (final f in ['phone', 'address', 'notes']) {
+          if ((keepRows.first[f] as String?)?.isEmpty ?? true) {
+            final v = removed.map((e) => (e[f] as String?) ?? '').firstWhere((e) => e.isNotEmpty, orElse: () => '');
+            if (v.isNotEmpty) upd[f] = v;
+          }
+        }
+        if (upd.isNotEmpty) {
+          upd['updated_at'] = now;
+          await t.update('parties', upd, where: 'id = ?', whereArgs: [keepRows.first['id']]);
+        }
+      }
+      for (final m in removed) {
+        undo.parties.add(Map.of(m));
+        await t.delete('parties', where: 'id = ?', whereArgs: [m['id']]);
+        await _tomb(t, 'customer', m['uid'] as String?);
+      }
+    });
+    return undo;
+  }
+
+  /// يدمج أسماء أصناف مكررة في اسم واحد [keep] (ويكمل الكود الفارغ من كود المُبقى).
+  Future<MergeUndo> mergeItems(String keep, List<String> from, {String keepCode = ''}) async {
+    final d = await db;
+    final undo = MergeUndo();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final src = from.where((e) => e != keep).toList();
+    if (src.isEmpty) return undo;
+    final ph = List.filled(src.length, '?').join(',');
+    final rows = await d.query('items',
+        columns: ['id', 'invoice_id', 'description', 'item_code'],
+        where: 'description IN ($ph)', whereArgs: src);
+    final invIds = {for (final m in rows) m['invoice_id'] as int};
+    final invRows = invIds.isEmpty
+        ? <Map<String, Object?>>[]
+        : await d.query('invoices',
+            columns: ['id', 'party', 'updated_at'],
+            where: 'id IN (${List.filled(invIds.length, '?').join(',')})', whereArgs: invIds.toList());
+    await d.transaction((t) async {
+      for (final m in rows) {
+        undo.items.add(Map.of(m));
+        final upd = <String, Object?>{'description': keep};
+        if (((m['item_code'] as String?) ?? '').trim().isEmpty && keepCode.isNotEmpty) {
+          upd['item_code'] = keepCode;
+        }
+        await t.update('items', upd, where: 'id = ?', whereArgs: [m['id']]);
+      }
+      for (final m in invRows) {
+        undo.invoices.add(Map.of(m));
+        await t.update('invoices', {'updated_at': now}, where: 'id = ?', whereArgs: [m['id']]);
+      }
+    });
+    return undo;
+  }
+
+  /// يتراجع عن دمج.
+  Future<void> undoMerge(MergeUndo u) async {
+    final d = await db;
+    await d.transaction((t) async {
+      for (final m in u.invoices) {
+        await t.update('invoices', {'party': m['party'], 'updated_at': m['updated_at']},
+            where: 'id = ?', whereArgs: [m['id']]);
+      }
+      for (final m in u.items) {
+        await t.update('items', {'description': m['description'], 'item_code': m['item_code']},
+            where: 'id = ?', whereArgs: [m['id']]);
+      }
+      final pb = u.partyBefore;
+      if (pb != null) {
+        await t.update('parties', {
+          'phone': pb['phone'], 'address': pb['address'], 'notes': pb['notes'], 'updated_at': pb['updated_at'],
+        }, where: 'id = ?', whereArgs: [pb['id']]);
+      }
+      for (final m in u.parties) {
+        await t.insert('parties', m, conflictAlgorithm: ConflictAlgorithm.replace);
+        final uid = m['uid'] as String?;
+        if (uid != null && uid.isNotEmpty) {
+          await t.delete('tombstones', where: 'entity = ? AND uid = ?', whereArgs: ['customer', uid]);
+        }
+      }
+    });
+  }
+
   Future<void> deleteParty(int id) async {
     final d = await db;
     final r = await d.query('parties', columns: ['uid'], where: 'id = ?', whereArgs: [id]);
@@ -852,6 +982,15 @@ extension PartyQueries on AppDatabase {
     final used = await knownParties();
     return {...saved, ...used}.toList();
   }
+}
+
+/// ما يلزم للتراجع عن دمج عملاء أو أصناف.
+class MergeUndo {
+  final List<Map<String, Object?>> invoices = [];
+  final List<Map<String, Object?>> items = [];
+  final List<Map<String, Object?>> parties = [];
+  Map<String, Object?>? partyBefore;
+  bool get isEmpty => invoices.isEmpty && items.isEmpty && parties.isEmpty;
 }
 
 class RecurringInfo {

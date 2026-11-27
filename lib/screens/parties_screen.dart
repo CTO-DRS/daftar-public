@@ -7,6 +7,7 @@ import '../services/settings_service.dart';
 import '../utils/number_utils.dart';
 import '../widgets/responsive.dart';
 import 'statement_screen.dart';
+import 'duplicates_screen.dart';
 
 /// العملاء والموردون: إضافة وتعديل وحذف، مع عدد فواتير كل طرف وإجماليه.
 class PartiesScreen extends StatefulWidget {
@@ -90,7 +91,18 @@ class _PartiesScreenState extends State<PartiesScreen> {
   Widget build(BuildContext context) {
     final cur = SettingsService.instance.currency;
     return Scaffold(
-      appBar: AppBar(title: const Text('العملاء والموردون')),
+      appBar: AppBar(title: const Text('العملاء والموردون'), actions: [
+        IconButton(
+          key: const ValueKey('open-dups'),
+          tooltip: 'منظّف التكرارات',
+          icon: const Icon(Icons.merge_type),
+          onPressed: () async {
+            await Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const DuplicatesScreen()));
+            _load();
+          },
+        ),
+      ]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(null),
         icon: const Icon(Icons.person_add_alt_1),
