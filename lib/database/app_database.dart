@@ -580,6 +580,17 @@ extension CatalogQueries on AppDatabase {
   }
 
   /// آخر استخدام لكل كود صنف: الوصف والسعر (كتالوج الأصناف المحفوظ تلقائياً).
+  /// آخر استخدام لكل صنف بالاسم (الوصف) ← بياناته: للإكمال التلقائي بعد المسح.
+  Future<Map<String, InvoiceItem>> itemHistory() async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT i.* FROM items i JOIN invoices v ON v.id = i.invoice_id "
+        "JOIN (SELECT MAX(i2.id) mid FROM items i2 JOIN invoices v2 ON v2.id = i2.invoice_id "
+        "WHERE TRIM(i2.description) != '' AND v2.kind IN ('invoice','quote') "
+        "GROUP BY LOWER(TRIM(i2.description))) t ON i.id = t.mid");
+    return {for (final m in r) (m['description'] as String).trim(): InvoiceItem.fromMap(m)};
+  }
+
   Future<Map<String, InvoiceItem>> itemCatalog() async {
     final d = await db;
     final r = await d.rawQuery(

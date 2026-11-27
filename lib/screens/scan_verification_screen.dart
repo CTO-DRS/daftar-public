@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../database/app_database.dart';
 import '../models/invoice.dart';
+import '../utils/auto_fill.dart';
 import '../models/invoice_item.dart';
 import '../models/ocr_result.dart';
 import '../services/ocr_service.dart';
@@ -52,7 +53,12 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
     try {
       final r = await OcrService().scan(widget.image);
       if (!mounted) return;
-      _party.text = r.party;
+      final db = AppDatabase.instance;
+      if (widget.kind != DocKind.expense) {
+        enrichItems(r.items, await db.itemHistory());
+      }
+      final known = await db.partyNames();
+      _party.text = matchParty(r.party, known) ?? r.party;
       _number.text = r.invoiceNumber.isNotEmpty
           ? r.invoiceNumber
           : await AppDatabase.instance.nextNumber();
