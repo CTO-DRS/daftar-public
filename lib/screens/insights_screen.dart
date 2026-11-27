@@ -5,6 +5,7 @@ import '../services/settings_service.dart';
 import '../utils/insights.dart';
 import '../utils/forecast.dart';
 import '../utils/restock.dart';
+import '../utils/cashflow.dart';
 import '../utils/number_utils.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/responsive.dart';
@@ -30,6 +31,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
   ProfitSummary? _today, _month;
   double _expMonth = 0;
   List<StockForecast> _stock = [];
+  CashOutlook? _cash;
 
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
     if (mounted) {
       setState(() {
         _stock = stock;
+        _cash = buildCashOutlook(all, now);
         _r = r;
         _today = today;
         _month = month;
@@ -182,6 +185,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
                   _Alerts(r.alerts),
                   if (_today != null && _month != null) _ProfitCard(_today!, _month!, _expMonth),
+                  if (_cash != null && !_cash!.isEmpty) _CashCard(_cash!),
                   _Section('توقع التحصيل', Icons.event_available_outlined),
                   _ForecastGrid(r.forecast),
                   _Section('أعمار الديون', Icons.timelapse),
@@ -549,4 +553,73 @@ class _StockTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// التدفق النقدي المتوقع خلال 30 يوماً: مخطط تراكمي صغير + أدنى نقطة.
+class _CashCard extends StatelessWidget {
+  final CashOutlook o;
+  const _CashCard(this.o);
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final cur = SettingsService.instance.currency;
+    final neg = o.lowest != null;
+    return Card(
+      key: const ValueKey('cash-card'),
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(Icons.show_chart, size: 20, color: cs.primary),
+            const SizedBox(width: 8),
+            const Text('التدفق النقدي (30 يوماً)',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 10),
+          Text('متوقع قبضه ${formatMoney(o.expectedIn)} $cur • متوقع صرفه ${formatMoney(o.expectedOut)} $cur',
+              style: const TextStyle(fontSize: 13)),
+          const SizedBox(height: 10),
+          SizedBox(height: 70, width: double.infinity, child: CustomPaint(painter: _CashPainter(o, cs.primary, const Color(0xFFEF4444), cs.outlineVariant))),
+          const SizedBox(height: 8),
+          Text(
+            neg
+                ? 'تنبيه: قد يتجاوز الصرف المقبوضات حتى ${formatMoney(-o.lowest!.cumulative)} $cur عند يوم ${o.lowest!.date.day}/${o.lowest!.date.month}. فعّل التحصيل قبله.'
+                : 'المقبوضات المتوقعة تغطي المصروفات المعتادة خلال الفترة.',
+            style: TextStyle(fontSize: 12, color: neg ? const Color(0xFFEF4444) : cs.outline),
+          ),
+          if (o.notDated > 0)
+            Text('فواتير بلا تاريخ استحقاق (${formatMoney(o.notDated)} $cur) غير محسوبة.',
+                style: TextStyle(fontSize: 11, color: cs.outline)),
+          Text('تقدير: يعتمد على سلوك سداد كل عميل ومتوسط مصروفاتك، بلا رصيد الصندوق.',
+              style: TextStyle(fontSize: 11, color: cs.outline)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _CashPainter extends CustomPainter {
+  final CashOutlook o;
+  final Color good, bad, axis;
+  _CashPainter(this.o, this.good, this.bad, this.axis);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final v = o.days.map((d) => d.cumulative).toList();
+    if (v.length < 2) return;
+    var lo = v.reduce((a, b) => a < b ? a : b), hi = v.reduce((a, b) => a > b ? a : b);
+    if (lo > 0) lo = 0;
+    if (hi < 0) hi = 0;
+    final span = (hi - lo) == 0 ? 1 : hi - lo;
+    double y(double x) => size.height - (x - lo) / span * size.height;
+    canvas.drawLine(Offset(0, y(0)), Offset(size.width, y(0)), Paint()..color = axis..strokeWidth = 1);
+    for (var k = 0; k < v.length - 1; k++) {
+      final x1 = size.width * k / (v.length - 1), x2 = size.width * (k + 1) / (v.length - 1);
+      canvas.drawLine(Offset(x1, y(v[k])), Offset(x2, y(v[k + 1])),
+          Paint()..color = v[k + 1] < 0 ? bad : good..strokeWidth = 2.5..strokeCap = StrokeCap.round);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CashPainter old) => old.o != o;
 }
