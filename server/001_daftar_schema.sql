@@ -66,3 +66,18 @@ create unique index if not exists shares_one_per_invoice on daftar.shares (user_
 alter table daftar.records drop constraint if exists records_entity_check;
 alter table daftar.records add constraint records_entity_check
   check (entity in ('customer','item','invoice','payment','doc','tiers'));
+
+-- v0.1.37: client-side encrypted backups (server only ever sees ciphertext)
+create table if not exists daftar.backups (
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  slot text not null check (slot in ('latest','previous')),
+  data text not null,
+  size int not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, slot)
+);
+alter table daftar.backups enable row level security;
+drop policy if exists own_backups on daftar.backups;
+create policy own_backups on daftar.backups for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+grant select, insert, update, delete on daftar.backups to authenticated;
