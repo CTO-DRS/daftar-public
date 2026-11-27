@@ -291,7 +291,7 @@ class AppDatabase {
     final c = await d.rawQuery('''
       SELECT LOWER(TRIM(i.description)) AS k, TRIM(i.description) AS name,
              (i.quantity + i.wholesale_qty * CASE WHEN i.pack_size > 0 THEN i.pack_size ELSE 1 END) AS qty,
-             v.date AS date
+             v.date AS date, i.pack_size AS pack
       FROM items i JOIN invoices v ON v.id = i.invoice_id
       WHERE v.kind = 'inventory' AND TRIM(i.description) != ''
     ''');
@@ -305,7 +305,7 @@ class AppDatabase {
     ''');
     DateTime dt(Object? v) => DateTime.fromMillisecondsSinceEpoch((v as int?) ?? 0);
     return computeStockForecast(
-      [for (final m in c) CountRow(m['k'] as String, m['name'] as String, (m['qty'] as num).toDouble(), dt(m['date']))],
+      [for (final m in c) CountRow(m['k'] as String, m['name'] as String, (m['qty'] as num).toDouble(), dt(m['date']), packSize: (m['pack'] as num?)?.toDouble() ?? 0)],
       [for (final m in s) SaleRow(m['k'] as String, (m['pieces'] as num).toDouble(), dt(m['date']))],
       now,
     );

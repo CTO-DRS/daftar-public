@@ -4,6 +4,7 @@ import '../database/app_database.dart';
 import '../services/settings_service.dart';
 import '../utils/insights.dart';
 import '../utils/forecast.dart';
+import '../utils/restock.dart';
 import '../utils/number_utils.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/responsive.dart';
@@ -86,6 +87,73 @@ class _InsightsScreenState extends State<InsightsScreen> {
     }
   }
 
+  Future<void> _restockSheet() async {
+    var lead = 7, cover = 30;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => StatefulBuilder(builder: (c, setS) {
+        final lines = planRestock(_stock, leadDays: lead, coverDays: cover);
+        return SafeArea(
+          child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+            const Text('خطة الشراء', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            const SizedBox(height: 8),
+            const Text('مدة التوريد'),
+            Wrap(spacing: 8, children: [
+              for (final d in const [3, 7, 14])
+                ChoiceChip(
+                    key: ValueKey('lead-$d'),
+                    label: Text('${localizeDigits('$d')} أيام'),
+                    selected: lead == d,
+                    onSelected: (_) => setS(() => lead = d)),
+            ]),
+            const SizedBox(height: 8),
+            const Text('أريد تغطية'),
+            Wrap(spacing: 8, children: [
+              for (final d in const [14, 30, 60])
+                ChoiceChip(
+                    key: ValueKey('cover-$d'),
+                    label: Text('${localizeDigits('$d')} يوماً'),
+                    selected: cover == d,
+                    onSelected: (_) => setS(() => cover = d)),
+            ]),
+            const Divider(height: 24),
+            if (lines.isEmpty) const Text('المخزون كافٍ، لا شراء مطلوب بهذه المدة.'),
+            for (final l in lines)
+              ListTile(
+                dense: true,
+                leading: Icon(
+                    l.urgency == RestockUrgency.now ? Icons.priority_high : Icons.circle_outlined,
+                    color: l.urgency == RestockUrgency.now ? Colors.red : null,
+                    size: 20),
+                title: Text(l.name),
+                subtitle: Text(
+                    'المتبقي ${formatQty(l.onHand)} • يُباع ${formatQty(double.parse(l.rate.toStringAsFixed(1)))} باليوم'
+                    '${l.rising ? ' • الطلب في ارتفاع' : ''}'),
+                trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(formatQty(l.qty), style: const TextStyle(fontWeight: FontWeight.w800)),
+                  if (l.packs > 0)
+                    Text('${formatQty(l.packs)} × ${formatQty(l.packSize)}', style: const TextStyle(fontSize: 11)),
+                ]),
+              ),
+            if (lines.isNotEmpty)
+              FilledButton.icon(
+                key: const ValueKey('share-restock'),
+                onPressed: () => Share.share(restockText(lines, DateTime.now(),
+                    company: SettingsService.instance.companyName, leadDays: lead, coverDays: cover)),
+                icon: const Icon(Icons.share_outlined),
+                label: const Text('مشاركة القائمة'),
+              ),
+            const SizedBox(height: 8),
+            const Text('الكمية = معدل البيع (متوسط 30 يوماً وآخر 14) × (التوريد + التغطية) − المتبقي، مقرّبة لكراتين كاملة عند معرفة حجم العبوة. تقدير وليس وعداً.',
+                style: TextStyle(fontSize: 11)),
+          ]),
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = _r;
@@ -125,6 +193,15 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   if (_stock.isNotEmpty) ...[
                     _Section('المخزون المتوقع', Icons.inventory_2_outlined),
                     for (final f in _stock.take(8)) _StockTile(f),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey('open-restock'),
+                        onPressed: _restockSheet,
+                        icon: const Icon(Icons.shopping_cart_checkout),
+                        label: const Text('خطة الشراء'),
+                      ),
+                    ),
                   ],
                   if (r.products.isNotEmpty) ...[
                     _Section('أفضل الأصناف إيراداً', Icons.workspace_premium_outlined),
