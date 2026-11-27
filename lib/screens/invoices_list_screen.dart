@@ -147,6 +147,12 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
           ),
           ListTile(
             minTileHeight: 56,
+            leading: const Icon(Icons.request_quote_outlined),
+            title: const Text('عرض سعر جديد'),
+            onTap: () => Navigator.pop(c, DocKind.quote),
+          ),
+          ListTile(
+            minTileHeight: 56,
             leading: const Icon(Icons.bolt),
             title: const Text('فاتورة سريعة (كتابة أو صوت)'),
             onTap: () async {
@@ -166,6 +172,70 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
       ),
     );
     if (kind != null) _open(null, kind: kind);
+  }
+
+  Future<void> _convertQuote(int id) async {
+    final q = await AppDatabase.instance.getInvoice(id);
+    if (q == null || !mounted) return;
+    final items = q.items;
+    final ctl = [
+      for (final it in items)
+        TextEditingController(
+            text: plainNumber(it.quantity > 0 ? it.quantity : it.wholesaleQty))
+    ];
+    final picked = List<bool>.filled(items.length, true);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          title: const Text('تحويل إلى فاتورة'),
+          content: SizedBox(
+            width: 420,
+            child: ListView(shrinkWrap: true, children: [
+              for (var i = 0; i < items.length; i++)
+                Row(children: [
+                  Checkbox(
+                      value: picked[i],
+                      onChanged: (v) => set(() => picked[i] = v ?? false)),
+                  Expanded(child: Text(items[i].description)),
+                  SizedBox(
+                    width: 70,
+                    child: TextField(
+                      controller: ctl[i],
+                      enabled: picked[i],
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ]),
+              const SizedBox(height: 8),
+              const Text('الباقي يبقى مفتوحاً في عرض السعر.',
+                  style: TextStyle(fontSize: 12)),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('إنشاء الفاتورة')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final chosen = <int, double>{
+      for (var i = 0; i < items.length; i++)
+        if (picked[i]) i: parseNumber(ctl[i].text) ?? 0
+    };
+    try {
+      final newId = await AppDatabase.instance.convertQuote(id, chosen);
+      await _load();
+      if (!mounted) return;
+      final inv = await AppDatabase.instance.getInvoice(newId);
+      if (inv != null) _open(inv);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   Future<void> _delete(InvoiceSummary s) async {
@@ -258,9 +328,11 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                   backgroundColor: Theme.of(context)
                                       .colorScheme
                                       .primaryContainer,
-                                  child: Icon(inv.kind == DocKind.invoice
-                                      ? Icons.receipt_long
-                                      : Icons.inventory_2_outlined),
+                                  child: Icon(switch (inv.kind) {
+                                    DocKind.invoice => Icons.receipt_long,
+                                    DocKind.quote => Icons.request_quote_outlined,
+                                    DocKind.inventory => Icons.inventory_2_outlined,
+                                  }),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -335,6 +407,8 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                             if (n != null) _open(n);
                                           } else if (v == 'recur') {
                                             _makeRecurring(inv);
+                                          } else if (v == 'convert') {
+                                            await _convertQuote(inv.id!);
                                           } else if (v == 'dup') {
                                             await AppDatabase.instance
                                                 .duplicateInvoice(inv.id!);
@@ -358,6 +432,10 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                                                 value: 'debit',
                                                 child: Text('إشعار مدين (زيادة)')),
                                           ],
+                                          if (inv.kind == DocKind.quote)
+                                            const PopupMenuItem(
+                                                value: 'convert',
+                                                child: Text('تحويل إلى فاتورة (جزئي أو كامل)')),
                                           if (inv.kind == DocKind.invoice && !inv.isNote)
                                             const PopupMenuItem(
                                                 value: 'recur',

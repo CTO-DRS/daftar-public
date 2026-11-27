@@ -1,13 +1,21 @@
 import 'invoice_item.dart';
 
 /// نوع المستند: فاتورة أو جدول جرد.
-enum DocKind { invoice, inventory }
+enum DocKind { invoice, inventory, quote }
 
 extension DocKindX on DocKind {
-  String get label => this == DocKind.invoice ? 'فاتورة' : 'جرد';
+  String get label => switch (this) {
+        DocKind.invoice => 'فاتورة',
+        DocKind.inventory => 'جرد',
+        DocKind.quote => 'عرض سعر',
+      };
   String get dbValue => name;
   static DocKind fromDb(String? v) =>
-      v == 'inventory' ? DocKind.inventory : DocKind.invoice;
+      switch (v) {
+        'inventory' => DocKind.inventory,
+        'quote' => DocKind.quote,
+        _ => DocKind.invoice,
+      };
 }
 
 /// حالة المستند.

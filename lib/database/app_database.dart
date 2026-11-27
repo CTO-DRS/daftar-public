@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
 import '../utils/forecast.dart';
+import '../utils/quote_split.dart';
 import '../utils/insights.dart';
 import '../utils/pricing.dart';
 import '../utils/recurrence.dart';
@@ -396,6 +397,32 @@ class AppDatabase {
     return saveInvoice(copy);
   }
 
+  /// تحويل جزئي لعرض سعر: ينشئ فاتورة (مسودة) بالأسطر المختارة ويبقي الباقي في العرض.
+  /// [chosen]: فهرس السطر ← الكمية المطلوب تحويلها. يعيد رقم الفاتورة الجديدة.
+  Future<int> convertQuote(int quoteId, Map<int, double> chosen) async {
+    final q = await getInvoice(quoteId);
+    if (q == null || q.kind != DocKind.quote) throw StateError('عرض السعر غير موجود');
+    final split = splitQuote(q.items, chosen);
+    if (split.converted.isEmpty) throw StateError('لم يتم اختيار أي سطر');
+    final inv = Invoice(
+      kind: DocKind.invoice,
+      number: await nextNumber(DocKind.invoice),
+      party: q.party,
+      notes: 'من عرض السعر ${q.number}',
+      currency: q.currency,
+      vatRate: q.vatRate,
+      items: split.converted,
+    );
+    final id = await saveInvoice(inv);
+    q.items = split.remaining;
+    q.notes = q.notes.isEmpty
+        ? 'حُوّل جزئياً إلى ${inv.number}'
+        : '${q.notes}\nحُوّل جزئياً إلى ${inv.number}';
+    if (q.items.isEmpty) q.status = InvoiceStatus.paid; // مُنجز بالكامل
+    await saveInvoice(q);
+    return id;
+  }
+
   /// إشعار دائن/مدين بنقرة واحدة من فاتورة قائمة (مسودة بنفس الأسطر للمراجعة).
   Future<int> createNote(int id, String type) async {
     final src = await getInvoice(id);
@@ -487,7 +514,11 @@ class AppDatabase {
   Future<String> nextNumber([DocKind kind = DocKind.invoice, String? prefix]) async {
     final d = await db;
     final st = SettingsService.instance;
-    prefix ??= kind == DocKind.inventory ? st.inventoryPrefix : st.numberPrefix;
+    prefix ??= switch (kind) {
+      DocKind.inventory => st.inventoryPrefix,
+      DocKind.quote => 'QT-',
+      DocKind.invoice => st.numberPrefix,
+    };
     final rows = await d.query('invoices', columns: ['number']);
     var max = st.numberStart - 1;
     for (final r in rows) {

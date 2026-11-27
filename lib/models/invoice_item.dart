@@ -81,6 +81,7 @@ class InvoiceItem {
         wholesalePrice: wholesalePrice,
         wholesaleUnit: wholesaleUnit,
         packSize: packSize,
+        costPrice: costPrice,
         flagged: flagged,
         statedTotal: statedTotal,
       );
