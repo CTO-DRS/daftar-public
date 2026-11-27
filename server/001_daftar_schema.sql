@@ -61,3 +61,8 @@ grant usage on schema daftar to authenticated, anon;
 grant select, insert, update, delete on daftar.records, daftar.shares to authenticated;
 
 create unique index if not exists shares_one_per_invoice on daftar.shares (user_id, invoice_id);
+
+-- v0.1.35: price tiers sync as entity 'tiers'
+alter table daftar.records drop constraint if exists records_entity_check;
+alter table daftar.records add constraint records_entity_check
+  check (entity in ('customer','item','invoice','payment','doc','tiers'));

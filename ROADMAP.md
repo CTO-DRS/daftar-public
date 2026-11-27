@@ -13,7 +13,7 @@ Pack-size and price tiers, split-per-ABI APKs (38 MB arm64), permanent signing k
 - Revoke a link. Link carries only the invoice snapshot, never other data.
 
 ## M4: Sync completeness and live stock
-- Sync price tiers, recurring invoices, expenses, settings that matter (numbering, currency).
+- Done in v0.1.35: price tiers sync (expenses already sync as documents). Recurring invoices deliberately NOT synced (two devices would both generate them). Settings sync still open.
 - Stock as a first-class ledger: on-hand per item, updated by confirmed invoices, purchases and counts, synced across devices. Low-stock banner.
 - Conflict view for same-record edits on two devices. Sync status chip in the list.
 

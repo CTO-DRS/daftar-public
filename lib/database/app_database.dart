@@ -39,6 +39,12 @@ class AppDatabase {
       PRIMARY KEY(entity, uid)
     )''';
 
+  static const _tierSyncDdl = '''
+    CREATE TABLE IF NOT EXISTS tier_sync(
+      item_key TEXT PRIMARY KEY,
+      updated_at INTEGER NOT NULL
+    )''';
+
   static const _tiersDdl = '''
     CREATE TABLE IF NOT EXISTS price_tiers(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,7 +88,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 13,
+      version: 14,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -109,6 +115,9 @@ class AppDatabase {
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_qty REAL NOT NULL DEFAULT 0');
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
           await d.execute("ALTER TABLE items ADD COLUMN wholesale_unit TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 14) {
+          await d.execute(_tierSyncDdl);
         }
         if (o < 13) {
           await d.execute('ALTER TABLE invoices ADD COLUMN uid TEXT');
@@ -179,6 +188,7 @@ class AppDatabase {
         await d.execute('ALTER TABLE parties ADD COLUMN uid TEXT');
         await d.execute('ALTER TABLE parties ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0');
         await d.execute(_tombDdl);
+        await d.execute(_tierSyncDdl);
         await d.execute(_recurringDdl);
         await d.execute('CREATE INDEX idx_items_invoice ON items(invoice_id, position)');
       },
@@ -205,6 +215,8 @@ class AppDatabase {
           await tx.insert('price_tiers', {'item_key': key, 'min_qty': t.minQty, 'price': t.price});
         }
       }
+      await tx.insert('tier_sync', {'item_key': key, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+          conflictAlgorithm: ConflictAlgorithm.replace);
     });
   }
 

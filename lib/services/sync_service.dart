@@ -185,6 +185,20 @@ class SyncService {
         },
       });
     }
+    final ts = await d.query('tier_sync', where: 'updated_at > ?', whereArgs: [since]);
+    for (final t in ts) {
+      final key = t['item_key'] as String;
+      if (applied.contains('tiers:$key')) continue;
+      final rows = await d.query('price_tiers', where: 'item_key = ?', whereArgs: [key], orderBy: 'min_qty');
+      recs.add({
+        'entity': 'tiers',
+        'id': key,
+        'data': {
+          'u': t['updated_at'],
+          'tiers': [for (final r in rows) {'min_qty': r['min_qty'], 'price': r['price']}],
+        },
+      });
+    }
     final tombs = await d.query('tombstones');
     for (final t in tombs) {
       recs.add({
@@ -248,6 +262,22 @@ class SyncService {
     final uid = row['id'] as String;
     final data = Map<String, dynamic>.from(row['data'] as Map);
     final u = (data['u'] as num?)?.toInt() ?? 0;
+    if (entity == 'tiers') {
+      if (row['deleted'] == true) return 0;
+      final cur = await d.query('tier_sync', where: 'item_key = ?', whereArgs: [uid], limit: 1);
+      final curU = cur.isEmpty ? -1 : (cur.first['updated_at'] as num).toInt();
+      if (curU >= u) return 0;
+      await d.transaction((tx) async {
+        await tx.delete('price_tiers', where: 'item_key = ?', whereArgs: [uid]);
+        for (final t in (data['tiers'] as List? ?? const [])) {
+          await tx.insert('price_tiers', {'item_key': uid, 'min_qty': t['min_qty'], 'price': t['price']});
+        }
+        await tx.insert('tier_sync', {'item_key': uid, 'updated_at': u},
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      });
+      applied.add('tiers:$uid');
+      return 1;
+    }
     final table = entity == 'invoice' ? 'invoices' : entity == 'customer' ? 'parties' : null;
     if (table == null) return 0;
     final local = await d.query(table, where: 'uid = ?', whereArgs: [uid], limit: 1);

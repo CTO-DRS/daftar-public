@@ -8,6 +8,7 @@ import 'package:daftar/database/app_database.dart';
 import 'package:daftar/models/invoice.dart';
 import 'package:daftar/models/invoice_item.dart';
 import 'package:daftar/models/party.dart';
+import 'package:daftar/utils/pricing.dart';
 import 'package:daftar/services/settings_service.dart';
 import 'package:daftar/services/sync_service.dart';
 
@@ -55,6 +56,8 @@ void main() {
     final d = await db.db;
     await d.delete('invoices');
     await d.delete('parties');
+    await d.delete('tier_sync');
+    await d.delete('price_tiers');
 
     await sync.signIn('a@b.c', 'secret1');
     expect(sync.enabled, isTrue);
@@ -80,6 +83,17 @@ void main() {
     expect(full.items.single.costPrice, 2);
     expect((await db.partyByName('سالم'))!.phone, '0555');
     expect(id, isNotNull);
+
+    // شرائح الأسعار تُزامَن أيضاً
+    await db.saveTiers('شاي', [PriceTier(10, 4.5)]);
+    expect((await sync.sync()).pushed, 1);
+    await d.delete('price_tiers');
+    await d.delete('tier_sync');
+    SettingsService.instance.syncCursor = '';
+    SettingsService.instance.syncPushTs = 0;
+    await sync.sync();
+    expect((await db.tiersFor('شاي')).single.price, 4.5);
+    await sync.sync();
 
     // لا صدى: دورة ثانية بلا تغيير لا ترفع ولا تنزل شيئاً
     final r3 = await sync.sync();
