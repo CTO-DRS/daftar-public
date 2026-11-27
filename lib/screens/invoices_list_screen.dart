@@ -16,6 +16,7 @@ import '../utils/followup.dart';
 import '../services/sync_service.dart';
 import '../services/share_service.dart';
 import '../services/auto_backup.dart';
+import '../utils/forecast.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'insights_screen.dart';
@@ -39,6 +40,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
   List<InvoiceSummary> _items = [];
   List<InvoiceSummary> _followUps = [];
   Map<String, ShareView> _views = {};
+  List<StockForecast> _low = [];
   Map<int, String> _uids = {};
   bool _loading = true;
   DashboardStats? _stats;
@@ -204,10 +206,14 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
         : await AppDatabase.instance.listInvoices();
     final stats = computeDashboard(all, DateTime.now(),
         currency: SettingsService.instance.currency);
+    final low = (await AppDatabase.instance.stockForecast(DateTime.now()))
+        .where((e) => e.daysLeft != null && e.daysLeft! <= 7)
+        .toList();
     final fu = dueForFollowUp(all, DateTime.now(), SettingsService.instance.reminded);
     if (!mounted) return;
     setState(() {
       _followUps = fu;
+      _low = low;
       _stats = stats;
       _items = list;
       _loading = false;
@@ -406,6 +412,24 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
         if (_stats != null && _stats!.hasData)
           DashboardHeader(
               stats: _stats!, currency: SettingsService.instance.currency),
+        if (_low.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Card(
+              color: Theme.of(context).colorScheme.tertiaryContainer,
+              child: ListTile(
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: Text('${localizeDigits('${_low.length}')} أصناف توشك أن تنفد'),
+                subtitle: Text(
+                    _low.take(3).map((e) => e.name).join('، ') + (_low.length > 3 ? '…' : ''),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const InsightsScreen())),
+              ),
+            ),
+          ),
         if (_followUps.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
