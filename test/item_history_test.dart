@@ -7,6 +7,7 @@ import 'package:daftar/models/invoice_item.dart';
 import 'package:daftar/services/settings_service.dart';
 
 void main() {
+  priceHistoryTests();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
   setUpAll(() async {
@@ -59,5 +60,20 @@ void main() {
     expect(l.first.quantity, 5);
     expect(await db.usualItems('مجهول'), isEmpty);
     expect(await db.lastInvoiceItems(''), isEmpty);
+  });
+}
+
+void priceHistoryTests() {
+  test('priceHistory lists price points oldest first with party and cost', () async {
+    final db = AppDatabase.instance;
+    await (await db.db).delete('invoices');
+    await db.saveInvoice(Invoice(number: 'P-1', party: 'أحمد', date: DateTime(2026, 1, 1), items: [InvoiceItem(description: 'رز', quantity: 1, unitPrice: 10, costPrice: 7)]));
+    await db.saveInvoice(Invoice(number: 'P-2', party: 'خالد', date: DateTime(2026, 2, 1), items: [InvoiceItem(description: 'رز', quantity: 1, unitPrice: 11)]));
+    await db.saveInvoice(Invoice(kind: DocKind.expense, number: 'P-3', items: [InvoiceItem(description: 'رز', quantity: 1, unitPrice: 1)]));
+    final h = await db.priceHistory();
+    final l = h.values.single;
+    expect(l.map((e) => e.price), [10, 11]);
+    expect(l.first.party, 'أحمد');
+    expect(l.first.cost, 7);
   });
 }

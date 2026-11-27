@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
+import '../utils/price_hints.dart';
 import '../utils/forecast.dart';
 import '../utils/quote_split.dart';
 import '../utils/insights.dart';
@@ -621,6 +622,29 @@ extension CatalogQueries on AppDatabase {
       for (final m in r)
         ItemStat(InvoiceItem.fromMap(m), (m['cnt'] as num?)?.toInt() ?? 1)
     ];
+  }
+
+  /// تاريخ أسعار كل صنف (بالاسم المطبّع) من الأقدم للأحدث، آخر [perItem] نقطة لكل صنف.
+  Future<Map<String, List<PricePoint>>> priceHistory({int perItem = 40}) async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT i.description, i.unit_price, i.cost_price, v.party, v.date FROM items i "
+        "JOIN invoices v ON v.id = i.invoice_id "
+        "WHERE v.kind IN ('invoice','quote') AND i.unit_price > 0 "
+        "AND TRIM(i.description) != '' ORDER BY v.date ASC, i.id ASC");
+    final out = <String, List<PricePoint>>{};
+    for (final m in r) {
+      out.putIfAbsent(normArabic(m['description'] as String), () => []).add(PricePoint(
+          (m['unit_price'] as num).toDouble(),
+          (m['cost_price'] as num?)?.toDouble() ?? 0,
+          (m['party'] as String?) ?? '',
+          DateTime.fromMillisecondsSinceEpoch((m['date'] as num).toInt())));
+    }
+    for (final k in out.keys.toList()) {
+      final l = out[k]!;
+      if (l.length > perItem) out[k] = l.sublist(l.length - perItem);
+    }
+    return out;
   }
 
   /// آخر سعر بيع لكل صنف (بالاسم المطبّع) لعميل معيّن.

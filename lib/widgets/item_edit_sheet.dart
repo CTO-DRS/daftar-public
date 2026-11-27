@@ -8,6 +8,7 @@ import '../utils/pricing.dart';
 import '../utils/number_utils.dart';
 import '../utils/smart_items.dart';
 import '../utils/anomaly.dart';
+import '../utils/price_hints.dart';
 import '../utils/auto_fill.dart' show normArabic;
 
 class ItemEditResult {
@@ -30,6 +31,7 @@ Future<ItemEditResult?> showItemEditSheet(
   Map<String, double> customerPrices = const {},
   List<InvoiceItem> others = const [],
   int maxPage = 1,
+  String party = '',
 }) {
   return showModalBottomSheet<ItemEditResult>(
     context: context,
@@ -44,7 +46,8 @@ Future<ItemEditResult?> showItemEditSheet(
         stats: stats,
         customerPrices: customerPrices,
         others: others,
-        maxPage: maxPage),
+        maxPage: maxPage,
+        party: party),
   );
 }
 
@@ -58,8 +61,10 @@ class _ItemEditSheet extends StatefulWidget {
   final Map<String, double> customerPrices;
   final List<InvoiceItem> others;
   final int maxPage;
+  final String party;
   const _ItemEditSheet(
       {required this.catalog,
+      this.party = '',
       this.maxPage = 1,
       this.others = const [],
       this.stats = const [],
@@ -104,6 +109,9 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
   void initState() {
     super.initState();
     _loadTiers();
+    AppDatabase.instance.priceHistory().then((h) {
+      if (mounted) setState(() => _hist = h);
+    }).catchError((_) {});
   }
 
   String get _key => tierKey(_code.text, _type.text);
@@ -200,6 +208,20 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
         history: h,
         customerPrice: widget.customerPrices[key],
         others: [for (final o in widget.others) if (!identical(o, widget.item)) o]);
+  }
+
+  Map<String, List<PricePoint>> _hist = const {};
+
+  List<PriceHint> _hints() {
+    final key = normArabic(_type.text);
+    final pts = _hist[key];
+    if (pts == null) return const [];
+    return priceHints(
+        description: _type.text,
+        price: parseNumber(_price.text) ?? 0,
+        cost: parseNumber(_cost.text) ?? 0,
+        party: widget.party,
+        points: pts);
   }
 
   List<ItemStat> _sugg = [];
@@ -407,6 +429,27 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                         key: const ValueKey('item-warning'),
                         style: const TextStyle(
                             fontSize: 12.5, color: Color(0xFFB45309)))),
+              ]),
+            ),
+          for (final h in _hints())
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(children: [
+                Icon(h.warn ? Icons.trending_down : Icons.lightbulb_outline,
+                    size: 18, color: h.warn ? const Color(0xFFB45309) : const Color(0xFF0F766E)),
+                const SizedBox(width: 6),
+                Expanded(
+                    child: Text(h.text,
+                        key: const ValueKey('price-hint'),
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            color: h.warn ? const Color(0xFFB45309) : const Color(0xFF0F766E)))),
+                if (h.suggested != null)
+                  ActionChip(
+                    key: const ValueKey('price-hint-apply'),
+                    label: Text(h.suggestedLabel ?? plainNumber(h.suggested!)),
+                    onPressed: () => setState(() => _price.text = plainNumber(h.suggested!)),
+                  ),
               ]),
             ),
           const SizedBox(height: 10),

@@ -266,6 +266,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         stats: _stats,
         customerPrices: cprices,
         others: _inv!.items,
+        party: _party.text,
         maxPage: _c!.manualPages ? (_c!.pages.isEmpty ? 1 : _c!.pages.last) : 1,
       );
       if (r == null || !mounted) return;

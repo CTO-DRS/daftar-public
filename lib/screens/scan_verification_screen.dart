@@ -92,7 +92,7 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
   Future<void> _edit(InvoiceItem it) async {
     final r = await showItemEditSheet(context,
         item: it, isNew: false, pinPrice: false, pinType: false,
-        stats: _stats, customerPrices: _cprices, others: _items);
+        stats: _stats, customerPrices: _cprices, others: _items, party: _party.text);
     if (r == null) return;
     setState(() {
       final i = _items.indexOf(it);
@@ -109,7 +109,8 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
         pinType: false,
         stats: _stats,
         customerPrices: _cprices,
-        others: _items);
+        others: _items,
+        party: _party.text);
     if (r == null) return;
     setState(() => _items.add(r.item));
   }
