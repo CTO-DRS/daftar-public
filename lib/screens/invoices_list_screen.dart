@@ -12,12 +12,12 @@ import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
 import 'quick_invoice_screen.dart';
-import '../utils/followup.dart';
 import '../services/sync_service.dart';
 import '../services/share_service.dart';
 import '../services/auto_backup.dart';
 import '../utils/forecast.dart';
 import '../utils/reorder.dart';
+import '../utils/collection.dart';
 import '../utils/customer_defaults.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
@@ -40,7 +40,7 @@ class InvoicesListScreen extends StatefulWidget {
 class _InvoicesListScreenState extends State<InvoicesListScreen> {
   final _search = TextEditingController();
   List<InvoiceSummary> _items = [];
-  List<InvoiceSummary> _followUps = [];
+  List<CollectionCase> _collect = [];
   Map<String, ShareView> _views = {};
   List<StockForecast> _low = [];
   List<ReorderDue> _reorder = [];
@@ -57,30 +57,55 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
         child: ListView(shrinkWrap: true, children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text('متابعة المتأخرات',
+            child: Text('مساعد التحصيل: لمن أطالب أولاً؟',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
           ),
-          for (final s in _followUps)
+          for (final k in _collect)
             ListTile(
-              title: Text(s.invoice.party.isEmpty ? s.invoice.number : s.invoice.party),
+              key: ValueKey('collect-${k.party}'),
+              leading: CircleAvatar(
+                backgroundColor: k.risk >= 70
+                    ? Colors.red.shade100
+                    : k.risk >= 40
+                        ? Colors.orange.shade100
+                        : Colors.green.shade100,
+                child: Text(localizeDigits('${k.risk}'),
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+              ),
+              title: Text(k.party),
               subtitle: Text(
-                  '${s.invoice.number} • متأخرة ${localizeDigits('${DateTime.now().difference(s.invoice.dueDate!).inDays}')} يوماً • المتبقي ${formatMoney(paymentRemaining(s.grandTotal, s.invoice.paidAmount, s.invoice.status))}'),
+                  '${formatMoney(k.total)} • ${localizeDigits('${k.invoices.length}')} فواتير • أقدمها ${localizeDigits('${k.maxLateDays}')} يوماً • رسالة ${k.tone.label}'
+                  '${k.bestWeekday != null ? '\nيسدد عادةً يوم ${weekdayNameAr(k.bestWeekday!)}' : ''}'
+                  '${k.usualDaysToPay != null ? ' (حوالي ${localizeDigits('${k.usualDaysToPay}')} يوماً)' : ''}'),
+              isThreeLine: k.bestWeekday != null,
               trailing: const Icon(Icons.send_outlined),
               onTap: () async {
                 Navigator.pop(c);
-                await _remind(s);
-                SettingsService.instance.markReminded(s.invoice.number);
+                await _remindCase(k);
+                for (final s in k.invoices) {
+                  SettingsService.instance.markReminded(s.invoice.number);
+                }
                 _load();
               },
             ),
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Text('بعد التذكير تختفي الفاتورة من هنا 3 أيام ثم تعود إن بقيت غير مسددة.',
+            child: Text('الرقم هو درجة الخطورة (٠ إلى ١٠٠) من تأخر الفواتير وسجل السداد. السجل تقريبي لأن التطبيق لا يحفظ تواريخ الدفعات. بعد التذكير يختفي العميل 3 أيام.',
                 style: TextStyle(fontSize: 12)),
           ),
         ]),
       ),
     );
+  }
+
+  Future<void> _remindCase(CollectionCase k) async {
+    final party = await AppDatabase.instance.partyByName(k.party);
+    final text = collectionText(k, company: SettingsService.instance.companyName);
+    final phone = waPhone(party?.phone ?? '');
+    if (!mounted) return;
+    final ok = await launchUrl(waUri(phone, text), mode: LaunchMode.externalApplication)
+        .catchError((_) => false);
+    if (!ok) await Share.share(text);
   }
 
   Future<void> _newFromLast(ReorderDue r) async {
@@ -274,12 +299,11 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
     final low = (await AppDatabase.instance.stockForecast(DateTime.now()))
         .where((e) => e.daysLeft != null && e.daysLeft! <= 7)
         .toList();
-    final fu = dueForFollowUp(all, DateTime.now(), SettingsService.instance.reminded);
     final ro = reorderDue(all, DateTime.now(), snoozed: SettingsService.instance.reorderSnooze);
     if (!mounted) return;
     setState(() {
       _reorder = ro;
-      _followUps = fu;
+      _collect = buildCollection(all, DateTime.now(), SettingsService.instance.reminded);
       _low = low;
       _stats = stats;
       _items = list;
@@ -514,7 +538,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
               ),
             ),
           ),
-        if (_followUps.isNotEmpty)
+        if (_collect.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Card(
@@ -522,8 +546,11 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
               child: ListTile(
                 leading: const Icon(Icons.notifications_active_outlined),
                 title: Text(
-                    '${localizeDigits('${_followUps.length}')} فواتير متأخرة تحتاج متابعة'),
-                subtitle: const Text('اضغط لإرسال تذكير مهذب بالواتساب'),
+                    '${localizeDigits('${_collect.length}')} عملاء متأخرون: لمن أطالب؟'),
+                subtitle: Text(
+                    'الأول: ${_collect.first.party} • ${formatMoney(_collect.first.total)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
                 trailing: const Icon(Icons.chevron_left),
                 onTap: _followUpSheet,
               ),
