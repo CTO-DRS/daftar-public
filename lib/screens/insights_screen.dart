@@ -6,6 +6,7 @@ import '../utils/insights.dart';
 import '../utils/forecast.dart';
 import '../utils/restock.dart';
 import '../utils/cashflow.dart';
+import '../utils/expense_category.dart';
 import '../utils/number_utils.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/responsive.dart';
@@ -32,6 +33,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
   double _expMonth = 0;
   List<StockForecast> _stock = [];
   CashOutlook? _cash;
+  Map<String, double> _expCats = {};
 
   @override
   void initState() {
@@ -56,6 +58,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
       setState(() {
         _stock = stock;
         _cash = buildCashOutlook(all, now);
+        _expCats = expensesByCategory(all, DateTime(now.year, now.month),
+            ExpenseClassifier.fromHistory(all.map((e) => e.invoice)));
         _r = r;
         _today = today;
         _month = month;
@@ -186,6 +190,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   _Alerts(r.alerts),
                   if (_today != null && _month != null) _ProfitCard(_today!, _month!, _expMonth),
                   if (_cash != null && !_cash!.isEmpty) _CashCard(_cash!),
+                  if (_expCats.isNotEmpty) _ExpCatCard(_expCats),
                   _Section('توقع التحصيل', Icons.event_available_outlined),
                   _ForecastGrid(r.forecast),
                   _Section('أعمار الديون', Icons.timelapse),
@@ -622,4 +627,44 @@ class _CashPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CashPainter old) => old.o != o;
+}
+
+/// مصروفات هذا الشهر حسب التصنيف.
+class _ExpCatCard extends StatelessWidget {
+  final Map<String, double> m;
+  const _ExpCatCard(this.m);
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final cur = SettingsService.instance.currency;
+    final total = m.values.fold(0.0, (a, b) => a + b);
+    return Card(
+      key: const ValueKey('expcat-card'),
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(Icons.category_outlined, size: 20, color: cs.primary),
+            const SizedBox(width: 8),
+            const Text('مصروفات الشهر حسب التصنيف', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 10),
+          for (final e in m.entries.take(7)) ...[
+            Row(children: [
+              Expanded(child: Text(e.key, style: const TextStyle(fontSize: 13))),
+              Text('${formatMoney(e.value)} $cur', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 3),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(value: total == 0 ? 0 : e.value / total, minHeight: 6, color: cs.primary, backgroundColor: cs.surfaceContainerHighest),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Text('التصنيف المقترح تلقائياً من المورد والملاحظات، وتصحيحك يعلّم دفتر.', style: TextStyle(fontSize: 11, color: cs.outline)),
+        ]),
+      ),
+    );
+  }
 }

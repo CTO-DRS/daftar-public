@@ -54,6 +54,7 @@ class Invoice {
   String noteType; // '' فاتورة عادية، 'credit' إشعار دائن، 'debit' إشعار مدين
   String refNumber; // رقم الفاتورة الأصلية للإشعار
   String currency; // عملة هذا المستند (فارغ = عملة الإعدادات)
+  String category; // تصنيف المصروف (للمصروفات فقط)
   List<InvoiceItem> items;
 
   Invoice({
@@ -71,6 +72,7 @@ class Invoice {
     this.vatRate = 0,
     this.noteType = '',
     this.refNumber = '',
+    this.category = '',
     List<InvoiceItem>? items,
   })  : date = date ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
@@ -126,6 +128,7 @@ class Invoice {
         'vat_rate': vatRate,
         'note_type': noteType,
         'ref_number': refNumber,
+        'category': category,
         'item_count': itemCount,
         'total_qty': totalQuantity,
         'grand_total': grandTotal,
@@ -150,6 +153,7 @@ class Invoice {
         vatRate: (m['vat_rate'] as num?)?.toDouble() ?? 0,
         noteType: (m['note_type'] as String?) ?? '',
         refNumber: (m['ref_number'] as String?) ?? '',
+        category: (m['category'] as String?) ?? '',
         items: items,
       );
 }

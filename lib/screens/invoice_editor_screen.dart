@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/expense_category.dart';
 import 'package:flutter/services.dart';
 import '../widgets/empty_state.dart';
 
@@ -45,6 +46,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   String _defaultsFor = '';
   bool _dupAck = false;
   List<String> _partyNames = [];
+  ExpenseClassifier? _cls;
 
   final _number = TextEditingController();
   final _party = TextEditingController();
@@ -90,6 +92,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _catalog = await _db.itemCatalog();
     _stats = await _db.itemStats();
     _partyNames = await _db.partyNames();
+    if (inv.kind == DocKind.expense) {
+      _cls = ExpenseClassifier.fromHistory((await _db.listInvoices()).map((e) => e.invoice));
+    }
     _number.text = inv.number;
     _party.text = inv.party;
     _notes.text = inv.notes;
@@ -189,6 +194,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     inv.number = _number.text.trim().isEmpty ? inv.number : _number.text.trim();
     inv.party = _party.text.trim();
     inv.notes = _notes.text.trim();
+    if (inv.kind == DocKind.expense && inv.category.isEmpty) {
+      inv.category = _cls?.suggest(inv.party, inv.notes) ?? '';
+    }
     inv.currency = _currencyCtl.text.trim();
     if (inv.status == InvoiceStatus.paid) inv.paidAmount = inv.grandTotal;
   }
@@ -776,6 +784,25 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   ),
                 ),
               ),
+              if (inv.kind == DocKind.expense) ...[
+                const SizedBox(height: 8),
+                Builder(builder: (context) {
+                  final sug = _cls?.suggest(_party.text.trim(), _notes.text.trim());
+                  final cur = inv.category.isNotEmpty ? inv.category : sug;
+                  return Wrap(key: const ValueKey('expense-cats'), spacing: 6, runSpacing: 4, children: [
+                    for (final c in expenseCategories)
+                      ChoiceChip(
+                        key: ValueKey('cat-$c'),
+                        label: Text(inv.category.isEmpty && c == sug ? '$c (مقترح)' : c, style: const TextStyle(fontSize: 12)),
+                        selected: c == cur,
+                        onSelected: (_) {
+                          setState(() => inv.category = c);
+                          _touch();
+                        },
+                      ),
+                  ]);
+                }),
+              ],
               if (_usual.isNotEmpty && !inv.isNote) ...[
                 const SizedBox(height: 8),
                 Align(
