@@ -3,6 +3,7 @@ import 'package:daftar/models/invoice_item.dart';
 import 'package:daftar/utils/quick_invoice.dart';
 
 void main() {
+  voiceParserTests();
   test('party and lines from a spoken sentence', () {
     final q = parseQuickInvoice('فاتورة لأحمد، 5 درزن كولا، 3 كرتون عصير برتقال بسعر 20');
     expect(q.party, 'أحمد');
@@ -41,5 +42,32 @@ void main() {
     expect(q.party, '');
     expect(q.items.single.quantity, 10);
     expect(q.items.single.description, 'سكر');
+  });
+}
+
+void voiceParserTests() {
+  group('voice phrases', () {
+    test('repeat last invoice for a customer', () {
+      final q = parseQuickInvoice('نفس الفاتورة السابقة لأحمد');
+      expect(q.repeatLast, isTrue);
+      expect(q.party, 'أحمد');
+      final q2 = parseQuickInvoice('كرر آخر فاتورة لمحمد علي');
+      expect(q2.repeatLast, isTrue);
+      expect(q2.party, 'محمد علي');
+    });
+    test('repeat plus extra line', () {
+      final q = parseQuickInvoice('نفس الفاتورة السابقة لأحمد، 3 كرتون عصير');
+      expect(q.repeatLast, isTrue);
+      expect(q.items.length, 1);
+      expect(q.items.first.description, 'عصير');
+    });
+    test('vat spoken', () {
+      expect(parseQuickInvoice('فاتورة لأحمد، 5 كولا بدون ضريبة').vatRate, 0);
+      final q = parseQuickInvoice('فاتورة لأحمد، 5 كولا ضريبة 15%');
+      expect(q.vatRate, 15);
+      expect(q.items.single.description, 'كولا');
+      expect(parseQuickInvoice('فاتورة لأحمد، 5 كولا').vatRate, isNull);
+      expect(parseQuickInvoice('فاتورة لأحمد، 5 كولا').repeatLast, isFalse);
+    });
   });
 }

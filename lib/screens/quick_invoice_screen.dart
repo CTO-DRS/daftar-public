@@ -4,6 +4,8 @@ import '../models/invoice.dart';
 import '../models/invoice_item.dart';
 import '../utils/number_utils.dart';
 import '../utils/quick_invoice.dart';
+import '../services/voice_input.dart';
+import '../services/settings_service.dart';
 import 'invoice_editor_screen.dart';
 
 /// فاتورة سريعة: اكتب أو املِ جملة واحدة وتتجهز الفاتورة تلقائياً.
@@ -21,6 +23,48 @@ class _QuickInvoiceScreenState extends State<QuickInvoiceScreen> {
   List<String> _parties = [];
   QuickInvoice _q = QuickInvoice('', []);
   bool _busy = false;
+  final _voice = VoiceInput();
+  bool _listening = false;
+  String _base = '';
+
+  @override
+  void dispose() {
+    _voice.cancel();
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleMic() async {
+    if (_listening) {
+      await _voice.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    final ok = await _voice.init(
+      onStatus: (st) {
+        if ((st == 'done' || st == 'notListening') && mounted) {
+          setState(() => _listening = false);
+        }
+      },
+      onError: (e) {
+        if (mounted) setState(() => _listening = false);
+      },
+    );
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('تعذر تشغيل الإملاء: اسمح للميكروفون وتأكد من خدمة التعرف على الكلام في هاتفك')));
+      return;
+    }
+    _base = _text.text.trim();
+    setState(() => _listening = true);
+    await _voice.start((words, _) {
+      final t = _base.isEmpty ? words : '$_base، $words';
+      _text.value = TextEditingValue(
+          text: t, selection: TextSelection.collapsed(offset: t.length));
+      _reparse(t);
+    });
+  }
 
   @override
   void initState() {
@@ -44,8 +88,16 @@ class _QuickInvoiceScreenState extends State<QuickInvoiceScreen> {
   Future<void> _create() async {
     setState(() => _busy = true);
     final number = await _db.nextNumber();
+    final items = <InvoiceItem>[];
+    if (_q.repeatLast && _q.party.isNotEmpty) {
+      items.addAll(await _db.lastInvoiceItems(_q.party));
+    }
+    items.addAll(_q.items);
     final inv = Invoice(
-        number: number, party: _q.party, items: _q.items);
+        number: number,
+        party: _q.party,
+        items: items,
+        vatRate: _q.vatRate ?? SettingsService.instance.defaultVatRate);
     final id = await _db.saveInvoice(inv);
     if (!mounted) return;
     await Navigator.pushReplacement(context,
@@ -65,14 +117,23 @@ class _QuickInvoiceScreenState extends State<QuickInvoiceScreen> {
             minLines: 3,
             maxLines: 6,
             onChanged: _reparse,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
+              suffixIcon: VoiceInput.supported
+                  ? IconButton(
+                      key: const ValueKey('mic'),
+                      tooltip: _listening ? 'إيقاف' : 'إملاء صوتي',
+                      icon: Icon(_listening ? Icons.stop_circle : Icons.mic,
+                          color: _listening ? Colors.red : null),
+                      onPressed: _toggleMic,
+                    )
+                  : null,
               labelText: 'اكتب أو املِ الفاتورة',
               hintText: 'فاتورة لأحمد، 5 درزن كولا، 3 كرتون عصير بسعر 20',
-              helperText: 'اضغط الميكروفون في لوحة المفاتيح للإملاء بالعربية',
+              helperText: 'اضغط 🎙️ وتكلم بالعربية. تقدر تقول «نفس الفاتورة السابقة» أو «بدون ضريبة»',
             ),
           ),
           const SizedBox(height: 16),
-          if (_q.items.isEmpty)
+          if (_q.items.isEmpty && !_q.repeatLast)
             Text('اكتب أصنافاً بالشكل: عدد + وحدة + اسم الصنف، وافصل بينها بفاصلة.',
                 style: TextStyle(color: cs.onSurfaceVariant))
           else ...[
@@ -83,6 +144,19 @@ class _QuickInvoiceScreenState extends State<QuickInvoiceScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w800)),
             ]),
             const SizedBox(height: 8),
+            if (_q.repeatLast)
+              Card(
+                  child: ListTile(
+                      leading: const Icon(Icons.replay),
+                      title: Text(_q.party.isEmpty
+                          ? 'نفس الفاتورة السابقة: اذكر اسم العميل'
+                          : 'ستُنسخ أسطر آخر فاتورة لـ ${_q.party}'))),
+            if (_q.vatRate != null)
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(_q.vatRate == 0
+                      ? 'بدون ضريبة'
+                      : 'ضريبة ${formatQty(_q.vatRate!)}%')),
             for (final it in _q.items)
               Card(
                 child: ListTile(
@@ -103,7 +177,9 @@ class _QuickInvoiceScreenState extends State<QuickInvoiceScreen> {
           SizedBox(
             height: 52,
             child: FilledButton.icon(
-              onPressed: _q.items.isEmpty || _busy ? null : _create,
+              onPressed: (_q.items.isEmpty && !(_q.repeatLast && _q.party.isNotEmpty)) || _busy
+                  ? null
+                  : _create,
               icon: const Icon(Icons.check),
               label: const Text('إنشاء الفاتورة'),
             ),

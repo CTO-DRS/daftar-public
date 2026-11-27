@@ -5,7 +5,13 @@ import 'number_utils.dart';
 class QuickInvoice {
   final String party;
   final List<InvoiceItem> items;
-  QuickInvoice(this.party, this.items);
+
+  /// «نفس الفاتورة السابقة»: انسخ أسطر آخر فاتورة لهذا العميل.
+  final bool repeatLast;
+
+  /// ضريبة ذكرها المتحدث («ضريبة 15» أو «بدون ضريبة» = 0)، أو null.
+  final double? vatRate;
+  QuickInvoice(this.party, this.items, {this.repeatLast = false, this.vatRate});
 }
 
 const _units = <String, String>{
@@ -61,6 +67,31 @@ QuickInvoice parseQuickInvoice(String text,
   t = t.replaceFirst(
       RegExp(r'^(?:من فضلك\s+)?(?:سوي|سوّي|اعمل|اكتب|سجل|أنشئ|انشئ)?\s*(?:لي\s+)?فاتورة\s*(?:جديدة\s*)?'),
       '');
+  // «نفس الفاتورة السابقة» / «كرر آخر فاتورة».
+  var repeatLast = false;
+  final rep = RegExp(
+      r'(?:(?:نفس|كرر|كرّر|اعد|أعد|مثل)\s+(?:آخر\s+|اخر\s+)?(?:ال)?فاتورة(?:\s+(?:ال)?(?:سابقة|اخيرة|أخيرة|الماضية|الاخيرة|الأخيرة))?|(?:ال)?فاتورة\s+(?:ال)?(?:سابقة|اخيرة|أخيرة|الماضية))');
+  if (rep.hasMatch(t)) {
+    repeatLast = true;
+    t = t.replaceFirst(rep, ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    t = t.replaceFirst(RegExp(r'^[\s،,:-]+'), '');
+  }
+  // الضريبة المذكورة صوتياً.
+  double? vat;
+  final noVat = RegExp(r'(?:بدون|من غير|بلا)\s+ضريبة');
+  final withVat = RegExp(
+      r'(?:مع\s+)?ضريبة\s*(\d+(?:\.\d+)?)\s*(?:%|٪|بالمية|بالمائة)?');
+  if (noVat.hasMatch(t)) {
+    vat = 0;
+    t = t.replaceFirst(noVat, ' ').trim();
+  } else {
+    final vm = withVat.firstMatch(t);
+    if (vm != null) {
+      vat = double.tryParse(vm.group(1)!);
+      t = t.replaceFirst(withVat, ' ').trim();
+    }
+  }
+  t = t.replaceAll(RegExp(r'\s+'), ' ').replaceFirst(RegExp(r'^[\s،,:-]+'), '').replaceFirst(RegExp(r'[\s،,:-]+$'), '');
   String party = '';
   final pm = RegExp(r'^(للعميل|للسيد|للمورد|الى|إلى|لـ|ل)\s*').firstMatch(t);
   if (pm != null && pm.end < t.length) {
@@ -102,7 +133,7 @@ QuickInvoice parseQuickInvoice(String text,
     final it = _parseLine(c, catalog);
     if (it != null) items.add(it);
   }
-  return QuickInvoice(party, items);
+  return QuickInvoice(party, items, repeatLast: repeatLast, vatRate: vat);
 }
 
 InvoiceItem? _parseLine(String chunk, List<InvoiceItem> catalog) {
