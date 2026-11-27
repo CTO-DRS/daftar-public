@@ -29,6 +29,7 @@ Future<ItemEditResult?> showItemEditSheet(
   List<ItemStat> stats = const [],
   Map<String, double> customerPrices = const {},
   List<InvoiceItem> others = const [],
+  int maxPage = 1,
 }) {
   return showModalBottomSheet<ItemEditResult>(
     context: context,
@@ -42,7 +43,8 @@ Future<ItemEditResult?> showItemEditSheet(
         catalog: catalog,
         stats: stats,
         customerPrices: customerPrices,
-        others: others),
+        others: others,
+        maxPage: maxPage),
   );
 }
 
@@ -55,8 +57,10 @@ class _ItemEditSheet extends StatefulWidget {
   final List<ItemStat> stats;
   final Map<String, double> customerPrices;
   final List<InvoiceItem> others;
+  final int maxPage;
   const _ItemEditSheet(
       {required this.catalog,
+      this.maxPage = 1,
       this.others = const [],
       this.stats = const [],
       this.customerPrices = const {},
@@ -174,6 +178,8 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
     });
   }
 
+  late int _page = widget.item.page;
+
   List<String> _warnings() {
     final key = normArabic(_type.text);
     if (key.isEmpty) return const [];
@@ -246,6 +252,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
       ..wholesaleUnit = _wUnit.text.trim()
       ..packSize = parseNumber(_pack.text) ?? 0
       ..costPrice = parseNumber(_cost.text) ?? 0
+      ..page = _page
       ..flagged = false;
     if (_tiersDirty) {
       AppDatabase.instance.saveTiers(_key, _tiers);
@@ -365,6 +372,29 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
             _pin(_pinPrice, () => setState(() => _pinPrice = !_pinPrice),
                 'تثبيت السعر الفردي'),
           ]),
+          if (widget.maxPage >= 1)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  const Text('الصفحة في PDF:'),
+                  ChoiceChip(
+                    key: const ValueKey('page-auto'),
+                    label: const Text('تلقائي'),
+                    selected: _page == 0,
+                    onSelected: (_) => setState(() => _page = 0),
+                  ),
+                  for (var n = 1; n <= widget.maxPage + 1; n++)
+                    ChoiceChip(
+                      key: ValueKey('page-$n'),
+                      label: Text(n > widget.maxPage ? '+ صفحة ${localizeDigits('$n')}' : localizeDigits('$n')),
+                      selected: _page == n,
+                      onSelected: (_) => setState(() => _page = n),
+                    ),
+                ]),
+              ),
+            ),
           for (final w in _warnings())
             Padding(
               padding: const EdgeInsets.only(top: 6),

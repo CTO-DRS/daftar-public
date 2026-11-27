@@ -90,7 +90,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 14,
+      version: 15,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -117,6 +117,9 @@ class AppDatabase {
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_qty REAL NOT NULL DEFAULT 0');
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
           await d.execute("ALTER TABLE items ADD COLUMN wholesale_unit TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 15) {
+          await d.execute('ALTER TABLE items ADD COLUMN page INTEGER NOT NULL DEFAULT 0');
         }
         if (o < 14) {
           await d.execute(_tierSyncDdl);
@@ -182,7 +185,8 @@ class AppDatabase {
             wholesale_price REAL NOT NULL DEFAULT 0,
             wholesale_unit TEXT NOT NULL DEFAULT '',
             pack_size REAL NOT NULL DEFAULT 0,
-            cost_price REAL NOT NULL DEFAULT 0
+            cost_price REAL NOT NULL DEFAULT 0,
+            page INTEGER NOT NULL DEFAULT 0
           )''');
         await d.execute(_tiersDdl);
         await d.execute(_auditDdl);

@@ -89,4 +89,31 @@ void main() {
       expect(q.any(has1), isFalse);
     }
   });
+
+  test('manual pages: each chosen page starts a new sheet, in page order', () async {
+    final has = (await Process.run('which', ['pdftotext'])).exitCode == 0;
+    if (!has) return;
+    Future<List<String>> pages(Invoice inv, PdfTemplate t) async {
+      final bytes = await PdfService.build(inv, company: 'Co', template: t);
+      final f = File('${Directory.systemTemp.path}/pages_${t.name}.pdf')..writeAsBytesSync(bytes);
+      final r = await Process.run('pdftotext', ['-layout', f.path, '-']);
+      return (r.stdout as String).split('\f').where((p) => p.trim().isNotEmpty).toList();
+    }
+    InvoiceItem it(String d, int pg) => InvoiceItem(description: d, quantity: 1, unitPrice: 5, page: pg);
+    bool has1(String p) => p.contains('\uFE8D\uFEDF\uFEA4\uFEAA\uFE8D\uFEA9');
+    for (final t in PdfTemplate.values) {
+      // ALPHA ص1، BETA ص3، GAMMA ص2: ثلاث ورقات بالترتيب ALPHA, GAMMA, BETA
+      final pg = await pages(
+          Invoice(number: '7', items: [it('ALPHA', 1), it('BETA', 3), it('GAMMA', 2)]), t);
+      expect(pg.length, 3, reason: t.name);
+      expect(pg[0].contains('ALPHA') && !pg[0].contains('GAMMA') && !pg[0].contains('BETA'), isTrue, reason: t.name);
+      expect(pg[1].contains('GAMMA') && !pg[1].contains('BETA'), isTrue, reason: t.name);
+      expect(pg[2].contains('BETA'), isTrue, reason: t.name);
+      expect(pg.where(has1).length, 1, reason: '${t.name}: credit footer only on last');
+      expect(has1(pg.last), isTrue);
+      // بدون صفحات يدوية: ورقة واحدة كما كان.
+      final auto = await pages(Invoice(number: '8', items: [it('ALPHA', 0), it('BETA', 0)]), t);
+      expect(auto.length, 1, reason: t.name);
+    }
+  });
 }

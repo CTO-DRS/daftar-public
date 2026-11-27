@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/invoice.dart';
+import '../utils/pages.dart';
 import '../models/invoice_item.dart';
 import '../utils/brand_color.dart';
 import '../utils/date_utils.dart';
@@ -208,7 +209,8 @@ class PdfService {
     int? brandColor, // ARGB؛ null = تلقائي من الشعار
   }) async {
     await _loadFonts();
-    final items = inv.items.where((e) => !e.isEmpty).toList();
+    final slices = pageSlices(inv.items.where((e) => !e.isEmpty).toList());
+    final items = [for (final sl in slices) ...sl];
     final modern = template == PdfTemplate.modern;
     final compact = template == PdfTemplate.compact;
     final theme = modern
@@ -261,6 +263,13 @@ class PdfService {
     final data = <List<String>>[
       for (var i = 0; i < items.length; i++) [for (final c in cols) c.$4(items[i], i)]
     ];
+    // صفوف كل صفحة (كل شريحة تبدأ بصفحة جديدة عند التحديد اليدوي).
+    final rowSlices = <List<List<String>>>[];
+    var off = 0;
+    for (final sl in slices) {
+      rowSlices.add(data.sublist(off, off + sl.length));
+      off += sl.length;
+    }
     final colWidths = <int, pw.TableColumnWidth>{
       for (var i = 0; i < cols.length; i++)
         i: cols[i].$2 == 0 ? const pw.FixedColumnWidth(24) : pw.FlexColumnWidth(cols[i].$2),
@@ -271,11 +280,11 @@ class PdfService {
     };
     final pad = pw.EdgeInsets.symmetric(horizontal: 4, vertical: compact ? 2.5 : (modern ? 6 : 4.5));
 
-    pw.Widget table() {
+    pw.Widget table(List<List<String>> rows) {
       if (modern) {
         return pw.TableHelper.fromTextArray(
           headers: headers,
-          data: data,
+          data: rows,
           border: pw.TableBorder(
             horizontalInside: pw.BorderSide(color: PdfColors.grey300, width: .5),
             bottom: pw.BorderSide(color: brand, width: 1),
@@ -292,7 +301,7 @@ class PdfService {
       }
       return pw.TableHelper.fromTextArray(
         headers: headers,
-        data: data,
+        data: rows,
         border: pw.TableBorder.all(color: PdfColors.grey400, width: .5),
         headerDecoration: pw.BoxDecoration(color: compact ? PdfColors.grey200 : brand),
         headerStyle: pw.TextStyle(
@@ -534,7 +543,13 @@ class PdfService {
           ),
         ),
         build: (ctx) => [
-          if (data.isEmpty) pw.Center(child: pw.Text('لا توجد أصناف')) else table(),
+          if (data.isEmpty)
+            pw.Center(child: pw.Text('لا توجد أصناف'))
+          else
+            for (var k = 0; k < rowSlices.length; k++) ...[
+              if (k > 0) pw.NewPage(),
+              table(rowSlices[k]),
+            ],
           if (data.isNotEmpty) pw.Wrap(children: [summarySection()]),
           if (showsIssuedBy(inv)) _issuedByBlock(),
         ],

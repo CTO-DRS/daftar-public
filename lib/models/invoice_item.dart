@@ -13,6 +13,8 @@ class InvoiceItem {
   double wholesalePrice; // سعر الجملة للوحدة الواحدة (اختياري)
   String wholesaleUnit; // وحدة الجملة: كرتون، درزن...
   double costPrice; // سعر التكلفة للقطعة (اختياري، لحساب الربح)
+  /// رقم الصفحة في PDF: 0 = تلقائي (مع السطر السابق)، وإلا الصفحة المحددة.
+  int page;
   double packSize; // كم قطعة في وحدة الجملة (1 كرتون = 24 حبة)، 0 = غير محدد
 
   /// يُضبط عندما يكتشف التدقيق خللاً في الصف (مسح OCR).
@@ -36,6 +38,7 @@ class InvoiceItem {
     this.wholesaleUnit = '',
     this.packSize = 0,
     this.costPrice = 0,
+    this.page = 0,
     this.flagged = false,
     this.statedTotal,
   });
@@ -82,6 +85,7 @@ class InvoiceItem {
         wholesaleUnit: wholesaleUnit,
         packSize: packSize,
         costPrice: costPrice,
+        page: page,
         flagged: flagged,
         statedTotal: statedTotal,
       );
@@ -102,6 +106,7 @@ class InvoiceItem {
         'wholesale_unit': wholesaleUnit,
         'pack_size': packSize,
         'cost_price': costPrice,
+        'page': page,
       };
 
   factory InvoiceItem.fromMap(Map<String, Object?> m) => InvoiceItem(
@@ -119,5 +124,6 @@ class InvoiceItem {
         wholesaleUnit: (m['wholesale_unit'] as String?) ?? '',
         packSize: (m['pack_size'] as num?)?.toDouble() ?? 0,
         costPrice: (m['cost_price'] as num?)?.toDouble() ?? 0,
+        page: (m['page'] as num?)?.toInt() ?? 0,
       );
 }

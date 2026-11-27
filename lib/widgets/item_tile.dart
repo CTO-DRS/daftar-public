@@ -11,6 +11,8 @@ class ItemTile extends StatelessWidget {
   final VoidCallback onDuplicate;
   final VoidCallback? onDuplicateMany;
   final VoidCallback onDelete;
+  final VoidCallback? onMovePage;
+  final int page; // 0 = لا تُعرض الصفحة
 
   const ItemTile({
     super.key,
@@ -20,6 +22,8 @@ class ItemTile extends StatelessWidget {
     required this.onDuplicate,
     this.onDuplicateMany,
     required this.onDelete,
+    this.onMovePage,
+    this.page = 0,
   });
 
   @override
@@ -65,6 +69,8 @@ class ItemTile extends StatelessWidget {
                       _Tag(Icons.tag, item.itemCode),
                     if (item.refNumber.isNotEmpty)
                       _Tag(Icons.radio_button_unchecked, item.refNumber),
+                    if (page > 0)
+                      _Tag(Icons.description_outlined, 'ص${localizeDigits('$page')}'),
                   ]),
                   Text(
                     item.description.isEmpty ? 'بدون وصف' : item.description,
@@ -112,12 +118,17 @@ class ItemTile extends StatelessWidget {
                       ? onDuplicate()
                       : v == 'dupn'
                           ? onDuplicateMany!()
-                          : onDelete(),
+                          : v == 'page'
+                              ? onMovePage!()
+                              : onDelete(),
                   itemBuilder: (_) => [
                     const PopupMenuItem(value: 'dup', child: Text('تكرار السطر')),
                     if (onDuplicateMany != null)
                       const PopupMenuItem(
                           value: 'dupn', child: Text('تكرار عدة مرات...')),
+                    if (onMovePage != null)
+                      const PopupMenuItem(
+                          value: 'page', child: Text('نقل إلى صفحة...')),
                     const PopupMenuItem(value: 'del', child: Text('حذف السطر')),
                   ],
                 ),

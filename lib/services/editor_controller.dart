@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/invoice.dart';
 import '../models/invoice_item.dart';
 import '../utils/number_utils.dart';
+import '../utils/pages.dart';
 import '../utils/sort_utils.dart';
 
 /// حالة شاشة تحرير المستند: الأسطر، التثبيت، الترتيب، البحث، الدفعات.
@@ -48,7 +49,63 @@ class EditorController extends ChangeNotifier {
   InvoiceItem blank() => InvoiceItem(
         unitPrice: pinPrice ? pinnedPrice : 0,
         description: pinType ? pinnedType : '',
+        page: pageTab,
       );
+
+  // ---------- الصفحات ----------
+  /// تبويب الصفحة المعروض: 0 = كل الأسطر، وإلا رقم الصفحة (والأسطر الجديدة تذهب إليها).
+  int pageTab = 0;
+
+  /// هل الفاتورة تستخدم صفحات يدوية.
+  bool get manualPages => usesManualPages(inv.items);
+
+  /// أرقام الصفحات المستخدمة.
+  List<int> get pages => usedPages(inv.items);
+
+  /// الصفحة الفعلية للسطر.
+  int pageOf(InvoiceItem it) {
+    final i = inv.items.indexOf(it);
+    return i < 0 ? 1 : effectivePages(inv.items)[i];
+  }
+
+  void selectPageTab(int p) {
+    pageTab = p;
+    notifyListeners();
+  }
+
+  /// يثبّت الصفحة الفعلية على كل سطر ثم يرتّب بثبات حسب الصفحة (يُستدعى عند أي تعديل يدوي).
+  void normalizePages() {
+    if (!manualPages) return;
+    final eff = effectivePages(inv.items);
+    for (var i = 0; i < inv.items.length; i++) {
+      inv.items[i].page = eff[i];
+    }
+    final idx = List<int>.generate(inv.items.length, (i) => i)
+      ..sort((a, b) {
+        final c = inv.items[a].page.compareTo(inv.items[b].page);
+        return c != 0 ? c : a.compareTo(b);
+      });
+    final sorted = [for (final i in idx) inv.items[i]];
+    inv.items
+      ..clear()
+      ..addAll(sorted);
+  }
+
+  /// ينقل سطراً إلى صفحة محددة (أو 0 = تلقائي مع السابق).
+  void movePage(InvoiceItem item, int page) {
+    materializePages();
+    item.page = page == 0 ? item.page : page;
+    normalizePages();
+    markDirty();
+  }
+
+  /// يثبّت الصفحة الفعلية على كل سطر حتى لا ينتقل غير المقصود بالوراثة.
+  void materializePages() {
+    final eff = effectivePages(inv.items);
+    for (var i = 0; i < inv.items.length; i++) {
+      inv.items[i].page = eff[i];
+    }
+  }
 
   /// يطبق نتيجة نافذة السطر: التثبيت ثم الإضافة أو الاستبدال.
   void applyEdit(InvoiceItem? old, InvoiceItem edited,
@@ -57,6 +114,13 @@ class EditorController extends ChangeNotifier {
     this.pinType = pinType;
     if (pinPrice) pinnedPrice = edited.unitPrice;
     if (pinType) pinnedType = edited.description;
+    if (old != null && edited.page != old.page) {
+      final eff = effectivePages(inv.items);
+      final oi = inv.items.indexOf(old);
+      for (var i = 0; i < inv.items.length; i++) {
+        if (i != oi) inv.items[i].page = eff[i];
+      }
+    }
     if (old == null) {
       inv.items.add(edited);
       _original.add(edited);
@@ -66,6 +130,7 @@ class EditorController extends ChangeNotifier {
       final j = _original.indexOf(old);
       if (j >= 0) _original[j] = edited;
     }
+    normalizePages();
     markDirty();
   }
 
@@ -96,7 +161,10 @@ class EditorController extends ChangeNotifier {
       inv.items.add(it);
       _original.add(it);
     }
-    if (items.isNotEmpty) markDirty();
+    if (items.isNotEmpty) {
+      normalizePages();
+      markDirty();
+    }
   }
 
   /// يحذف سطراً ويعيد موضعه للتراجع (-1 إن لم يوجد).
@@ -169,9 +237,12 @@ class EditorController extends ChangeNotifier {
   /// مواضع الأسطر المطابقة للبحث الحالي.
   List<int> get visibleIndices {
     final q = normalizeDigits(_query).trim().toLowerCase();
+    final eff = pageTab > 0 ? effectivePages(inv.items) : const <int>[];
     return [
       for (var i = 0; i < inv.items.length; i++)
-        if (q.isEmpty || itemMatchesQuery(inv.items[i], q)) i,
+        if ((pageTab == 0 || eff[i] == pageTab) &&
+            (q.isEmpty || itemMatchesQuery(inv.items[i], q)))
+          i,
     ];
   }
 

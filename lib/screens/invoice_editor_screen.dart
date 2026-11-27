@@ -266,6 +266,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         stats: _stats,
         customerPrices: cprices,
         others: _inv!.items,
+        maxPage: _c!.manualPages ? (_c!.pages.isEmpty ? 1 : _c!.pages.last) : 1,
       );
       if (r == null || !mounted) return;
       _c!.applyEdit(isNew ? null : item, r.item,
@@ -277,6 +278,42 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       }
       return;
     }
+  }
+
+  /// نقل سطر إلى صفحة معينة بضغطة واحدة (أو صفحة جديدة).
+  Future<void> _movePageSheet(InvoiceItem it) async {
+    final c = _c!;
+    final cur = c.manualPages ? c.pageOf(it) : 1;
+    final pages = c.manualPages ? c.pages : [1];
+    final next = (pages.isEmpty ? 1 : pages.last) + 1;
+    final p = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('نقل السطر إلى صفحة',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          ),
+          for (final n in pages)
+            ListTile(
+              key: ValueKey('move-$n'),
+              leading: Icon(n == cur ? Icons.check_circle : Icons.description_outlined),
+              title: Text('صفحة ${localizeDigits('$n')}'),
+              onTap: () => Navigator.pop(ctx, n),
+            ),
+          ListTile(
+            key: const ValueKey('move-new'),
+            leading: const Icon(Icons.note_add_outlined),
+            title: Text('صفحة جديدة (${localizeDigits('$next')})'),
+            onTap: () => Navigator.pop(ctx, next),
+          ),
+        ]),
+      ),
+    );
+    if (p == null || !mounted) return;
+    c.movePage(it, p);
   }
 
   Future<void> _quickAdd() async {
@@ -521,6 +558,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                                 onDuplicate: () => _duplicate(it),
                                 onDuplicateMany: () => _duplicateMany(it),
                                 onDelete: () => _delete(it),
+                                page: _c!.manualPages ? _c!.pageOf(it) : 0,
+                                onMovePage: () => _movePageSheet(it),
                               ),
                             ),
                           );
