@@ -20,6 +20,7 @@ import '../utils/number_utils.dart';
 import '../utils/platform_utils.dart';
 import '../widgets/responsive.dart';
 import '../widgets/app_lock.dart';
+import '../widgets/sync_card.dart';
 import 'audit_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -283,6 +284,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ]),
         const SizedBox(height: 16),
+        const SyncCard(),
+        const SizedBox(height: 12),
         Card(
           child: ListTile(
             leading: const CircleAvatar(

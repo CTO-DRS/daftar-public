@@ -55,6 +55,22 @@ class SettingsService {
   String get pdfTemplate => _p.getString('pdf_template') ?? 'classic';
   set pdfTemplate(String v) => _p.setString('pdf_template', v);
 
+  // ---- المزامنة السحابية (اختيارية) ----
+  String get syncEmail => _p.getString('sync_email') ?? '';
+  set syncEmail(String v) => _p.setString('sync_email', v);
+  String get syncToken => _p.getString('sync_token') ?? '';
+  set syncToken(String v) => _p.setString('sync_token', v);
+  String get syncRefresh => _p.getString('sync_refresh') ?? '';
+  set syncRefresh(String v) => _p.setString('sync_refresh', v);
+  int get syncExpires => _p.getInt('sync_expires') ?? 0;
+  set syncExpires(int v) => _p.setInt('sync_expires', v);
+  String get syncCursor => _p.getString('sync_cursor') ?? '';
+  set syncCursor(String v) => _p.setString('sync_cursor', v);
+  int get syncPushTs => _p.getInt('sync_push_ts') ?? 0;
+  set syncPushTs(int v) => _p.setInt('sync_push_ts', v);
+  int get syncLast => _p.getInt('sync_last') ?? 0;
+  set syncLast(int v) => _p.setInt('sync_last', v);
+
   String get currency => _p.getString('currency') ?? 'ر.س';
   set currency(String v) => _p.setString('currency', v.trim());
 

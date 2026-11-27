@@ -31,6 +31,14 @@ class AppDatabase {
       notes TEXT NOT NULL DEFAULT ''
     )''';
 
+  static const _tombDdl = '''
+    CREATE TABLE IF NOT EXISTS tombstones(
+      entity TEXT NOT NULL,
+      uid TEXT NOT NULL,
+      ts INTEGER NOT NULL,
+      PRIMARY KEY(entity, uid)
+    )''';
+
   static const _tiersDdl = '''
     CREATE TABLE IF NOT EXISTS price_tiers(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +82,7 @@ class AppDatabase {
     return factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-      version: 12,
+      version: 13,
       onUpgrade: (d, o, n) async {
         if (o < 2) {
           await d.execute("ALTER TABLE invoices ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'");
@@ -101,6 +109,12 @@ class AppDatabase {
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_qty REAL NOT NULL DEFAULT 0');
           await d.execute('ALTER TABLE items ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
           await d.execute("ALTER TABLE items ADD COLUMN wholesale_unit TEXT NOT NULL DEFAULT ''");
+        }
+        if (o < 13) {
+          await d.execute('ALTER TABLE invoices ADD COLUMN uid TEXT');
+          await d.execute('ALTER TABLE parties ADD COLUMN uid TEXT');
+          await d.execute('ALTER TABLE parties ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0');
+          await d.execute(_tombDdl);
         }
         if (o < 12) {
           await d.execute('ALTER TABLE items ADD COLUMN cost_price REAL NOT NULL DEFAULT 0');
@@ -130,6 +144,7 @@ class AppDatabase {
             party TEXT NOT NULL DEFAULT '',
             notes TEXT NOT NULL DEFAULT '',
             updated_at INTEGER NOT NULL,
+            uid TEXT,
             due_date INTEGER,
             paid_amount REAL NOT NULL DEFAULT 0,
             currency TEXT NOT NULL DEFAULT '',
@@ -161,6 +176,9 @@ class AppDatabase {
         await d.execute(_tiersDdl);
         await d.execute(_auditDdl);
         await d.execute(_partiesDdl);
+        await d.execute('ALTER TABLE parties ADD COLUMN uid TEXT');
+        await d.execute('ALTER TABLE parties ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0');
+        await d.execute(_tombDdl);
         await d.execute(_recurringDdl);
         await d.execute('CREATE INDEX idx_items_invoice ON items(invoice_id, position)');
       },
@@ -367,11 +385,20 @@ class AppDatabase {
     return d.query('audit_log', orderBy: 'id DESC', limit: limit);
   }
 
+  /// سجل حذف للمزامنة (فقط لما سبق رفعه أي له uid).
+  Future<void> _tomb(Database d, String entity, String? uid) async {
+    if (uid == null || uid.isEmpty) return;
+    await d.insert('tombstones',
+        {'entity': entity, 'uid': uid, 'ts': DateTime.now().millisecondsSinceEpoch},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
   Future<void> deleteInvoice(int id) async {
     final d = await db;
     final r = await d.query('invoices',
-        columns: ['number', 'grand_total'], where: 'id = ?', whereArgs: [id]);
+        columns: ['number', 'grand_total', 'uid'], where: 'id = ?', whereArgs: [id]);
     await d.delete('invoices', where: 'id = ?', whereArgs: [id]);
+    await _tomb(d, 'invoice', r.isEmpty ? null : r.first['uid'] as String?);
     if (r.isNotEmpty) {
       await logAudit('delete', id, (r.first['number'] as String?) ?? '',
           'الإجمالي ${(r.first['grand_total'] as num?)?.toStringAsFixed(2)}');
@@ -594,7 +621,9 @@ extension PartyQueries on AppDatabase {
 
   Future<void> saveParty(Party p) async {
     final d = await db;
-    final m = p.toMap()..remove('id');
+    final m = p.toMap()
+      ..remove('id')
+      ..['updated_at'] = DateTime.now().millisecondsSinceEpoch;
     if (p.id == null) {
       p.id = await d.insert('parties', m, conflictAlgorithm: ConflictAlgorithm.replace);
     } else {
@@ -604,7 +633,9 @@ extension PartyQueries on AppDatabase {
 
   Future<void> deleteParty(int id) async {
     final d = await db;
+    final r = await d.query('parties', columns: ['uid'], where: 'id = ?', whereArgs: [id]);
     await d.delete('parties', where: 'id = ?', whereArgs: [id]);
+    await _tomb(d, 'customer', r.isEmpty ? null : r.first['uid'] as String?);
   }
 
   /// أسماء العملاء: المحفوظون أولاً ثم الأسماء السابقة في الفواتير.

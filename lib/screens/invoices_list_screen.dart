@@ -13,6 +13,7 @@ import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
 import 'quick_invoice_screen.dart';
 import '../utils/followup.dart';
+import '../services/sync_service.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'insights_screen.dart';
@@ -99,6 +100,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
     super.initState();
     _load();
     _runRecurring();
+    _autoSync();
   }
 
   Future<void> _runRecurring() async {
@@ -141,6 +143,15 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
     super.dispose();
   }
 
+  /// مزامنة صامتة إن كانت مفعّلة، ثم إعادة التحميل إذا نزل شيء.
+  Future<void> _autoSync() async {
+    if (!SyncService.instance.enabled) return;
+    try {
+      final r = await SyncService.instance.sync();
+      if (r.pulled + r.deleted > 0 && mounted) _load();
+    } catch (_) {}
+  }
+
   Future<void> _load() async {
     final list = await AppDatabase.instance.listInvoices(query: _search.text);
     final all = _search.text.trim().isEmpty
@@ -165,6 +176,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
           builder: (_) => InvoiceEditorScreen(invoiceId: inv?.id, newKind: kind)),
     );
     _load();
+    _autoSync();
   }
 
   Future<void> _scan() async {
