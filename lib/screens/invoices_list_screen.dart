@@ -15,6 +15,7 @@ import 'quick_invoice_screen.dart';
 import '../utils/followup.dart';
 import '../services/sync_service.dart';
 import '../services/share_service.dart';
+import '../services/auto_backup.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'insights_screen.dart';
@@ -104,6 +105,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
     _load();
     _runRecurring();
     _autoSync();
+    AutoBackup.runIfDue().catchError((_) => null);
   }
 
   Future<void> _runRecurring() async {

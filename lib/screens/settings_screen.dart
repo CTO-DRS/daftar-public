@@ -21,6 +21,7 @@ import '../utils/platform_utils.dart';
 import '../widgets/responsive.dart';
 import '../widgets/app_lock.dart';
 import '../widgets/sync_card.dart';
+import '../services/auto_backup.dart';
 import 'audit_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -95,6 +96,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       m.showSnackBar(SnackBar(content: Text('تعذر إنشاء النسخة: $e')));
+    }
+  }
+
+  Future<void> _restoreAuto() async {
+    final m = ScaffoldMessenger.of(context);
+    final files = await AutoBackup.list();
+    if (!mounted) return;
+    if (files.isEmpty) {
+      m.showSnackBar(const SnackBar(content: Text('لا توجد نسخ تلقائية بعد. تُنشأ أول نسخة عند فتح التطبيق وفيه بيانات.')));
+      return;
+    }
+    final pick = await showModalBottomSheet<File>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          for (final f in files)
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: Text(f.path.split(RegExp(r'[\\/]')).last.replaceAll('auto-', '').replaceAll('.json', ''),
+                  textDirection: TextDirection.ltr),
+              subtitle: Text('${(f.lengthSync() / 1024).toStringAsFixed(0)} ك.ب'),
+              onTap: () => Navigator.pop(c, f),
+            ),
+        ]),
+      ),
+    );
+    if (pick == null || !mounted) return;
+    try {
+      final text = await pick.readAsString();
+      final sum = BackupService.summarize(BackupService.parse(text));
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('استعادة هذه النسخة؟'),
+          content: Text('ستُستبدل بياناتك الحالية: ${localizeDigits('${sum.invoices}')} مستنداً و${localizeDigits('${sum.parties}')} عميلاً.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('استعادة')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      await BackupService.restore(text);
+      m.showSnackBar(const SnackBar(content: Text('تمت الاستعادة. أعد فتح القائمة الرئيسية.')));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text('تعذرت الاستعادة: $e')));
     }
   }
 
@@ -283,7 +332,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ]),
-        const SizedBox(height: 16),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('نسخ احتياطي تلقائي يومي'),
+          subtitle: const Text('آخر 7 نسخ داخل التطبيق. تُحذف مع حذف التطبيق، فصدّر نسخة أو فعّل المزامنة للحماية الكاملة.',
+              style: TextStyle(fontSize: 12)),
+          value: s.autoBackup,
+          onChanged: (v) => setState(() => s.autoBackup = v),
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            onPressed: _restoreAuto,
+            icon: const Icon(Icons.history),
+            label: const Text('استعادة من نسخة تلقائية'),
+          ),
+        ),
+        const SizedBox(height: 8),
         const SyncCard(),
         const SizedBox(height: 12),
         Card(

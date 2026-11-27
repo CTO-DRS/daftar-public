@@ -71,6 +71,9 @@ class SettingsService {
   int get syncLast => _p.getInt('sync_last') ?? 0;
   set syncLast(int v) => _p.setInt('sync_last', v);
 
+  bool get autoBackup => _p.getBool('auto_backup') ?? true;
+  set autoBackup(bool v) => _p.setBool('auto_backup', v);
+
   String get currency => _p.getString('currency') ?? 'ر.س';
   set currency(String v) => _p.setString('currency', v.trim());
 
