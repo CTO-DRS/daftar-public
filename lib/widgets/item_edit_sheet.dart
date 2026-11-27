@@ -7,6 +7,7 @@ import '../models/invoice_item.dart';
 import '../utils/pricing.dart';
 import '../utils/number_utils.dart';
 import '../utils/smart_items.dart';
+import '../utils/anomaly.dart';
 import '../utils/auto_fill.dart' show normArabic;
 
 class ItemEditResult {
@@ -27,6 +28,7 @@ Future<ItemEditResult?> showItemEditSheet(
   Map<String, InvoiceItem> catalog = const {},
   List<ItemStat> stats = const [],
   Map<String, double> customerPrices = const {},
+  List<InvoiceItem> others = const [],
 }) {
   return showModalBottomSheet<ItemEditResult>(
     context: context,
@@ -39,7 +41,8 @@ Future<ItemEditResult?> showItemEditSheet(
         pinType: pinType,
         catalog: catalog,
         stats: stats,
-        customerPrices: customerPrices),
+        customerPrices: customerPrices,
+        others: others),
   );
 }
 
@@ -51,8 +54,10 @@ class _ItemEditSheet extends StatefulWidget {
   final Map<String, InvoiceItem> catalog;
   final List<ItemStat> stats;
   final Map<String, double> customerPrices;
+  final List<InvoiceItem> others;
   const _ItemEditSheet(
       {required this.catalog,
+      this.others = const [],
       this.stats = const [],
       this.customerPrices = const {},
       required this.item,
@@ -167,6 +172,28 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
         _price.text = plainNumber(hit.unitPrice);
       }
     });
+  }
+
+  List<String> _warnings() {
+    final key = normArabic(_type.text);
+    if (key.isEmpty) return const [];
+    InvoiceItem? h;
+    for (final s in widget.stats) {
+      if (normArabic(s.last.description) == key) {
+        h = s.last;
+        break;
+      }
+    }
+    final cur = InvoiceItem(
+        itemCode: _code.text.trim(),
+        description: _type.text,
+        quantity: parseNumber(_qty.text) ?? 0,
+        unitPrice: parseNumber(_price.text) ?? 0,
+        costPrice: parseNumber(_cost.text) ?? 0);
+    return itemWarnings(cur,
+        history: h,
+        customerPrice: widget.customerPrices[key],
+        others: [for (final o in widget.others) if (!identical(o, widget.item)) o]);
   }
 
   List<ItemStat> _sugg = [];
@@ -338,6 +365,20 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
             _pin(_pinPrice, () => setState(() => _pinPrice = !_pinPrice),
                 'تثبيت السعر الفردي'),
           ]),
+          for (final w in _warnings())
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 18, color: Color(0xFFB45309)),
+                const SizedBox(width: 6),
+                Expanded(
+                    child: Text(w,
+                        key: const ValueKey('item-warning'),
+                        style: const TextStyle(
+                            fontSize: 12.5, color: Color(0xFFB45309)))),
+              ]),
+            ),
           const SizedBox(height: 10),
           TextField(
               controller: _cost,

@@ -43,6 +43,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   int _lastCount = 0;
   String _usualFor = '';
   String _defaultsFor = '';
+  bool _dupAck = false;
   List<String> _partyNames = [];
 
   final _number = TextEditingController();
@@ -213,6 +214,29 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   Future<bool> _save({bool quiet = false}) async {
     final inv = _inv!;
     _syncHeader();
+    if (!quiet && !_dupAck) {
+      final dup = await _db.findDuplicateInvoice(inv);
+      if (dup != null && mounted) {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('فاتورة مكررة محتملة؟'),
+            content: Text(
+                'يوجد اليوم فاتورة ($dup) لنفس العميل بنفس الإجمالي. هل تريد الحفظ على أي حال؟'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('رجوع')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('حفظ على أي حال')),
+            ],
+          ),
+        );
+        if (go != true) return false;
+        _dupAck = true;
+      }
+    }
     await _db.saveInvoice(inv);
     if (mounted) {
       _c!.markSaved();
@@ -241,6 +265,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         catalog: _catalog,
         stats: _stats,
         customerPrices: cprices,
+        others: _inv!.items,
       );
       if (r == null || !mounted) return;
       _c!.applyEdit(isNew ? null : item, r.item,

@@ -700,6 +700,24 @@ extension CatalogQueries on AppDatabase {
     return out;
   }
 
+  /// فاتورة محتملة التكرار: نفس العميل والإجمالي في نفس اليوم (غير الفاتورة نفسها).
+  Future<String?> findDuplicateInvoice(Invoice inv) async {
+    if (inv.kind != DocKind.invoice || inv.party.trim().isEmpty || inv.items.isEmpty) return null;
+    final d = await db;
+    final day = DateTime(inv.date.year, inv.date.month, inv.date.day);
+    final r = await d.rawQuery(
+        "SELECT number, grand_total FROM invoices WHERE party = ? AND kind = 'invoice' "
+        "AND date >= ? AND date < ? AND (? IS NULL OR id != ?)",
+        [inv.party.trim(), day.millisecondsSinceEpoch,
+         day.add(const Duration(days: 1)).millisecondsSinceEpoch, inv.id, inv.id]);
+    final total = inv.grandTotal;
+    for (final m in r) {
+      final t = (m['grand_total'] as num?)?.toDouble() ?? 0;
+      if ((t - total).abs() < 0.005) return m['number'] as String?;
+    }
+    return null;
+  }
+
   Future<Map<String, InvoiceItem>> itemCatalog() async {
     final d = await db;
     final r = await d.rawQuery(
