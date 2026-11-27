@@ -18,3 +18,6 @@
 -keep class com.google.firebase.components.** { *; }
 -keep class * implements com.google.firebase.components.ComponentRegistrar { *; }
 -keepclasseswithmembernames class * { native <methods>; }
+
+# flutter_local_notifications serialises scheduled notifications with Gson (reflection).
+-keep class com.dexterous.** { *; }

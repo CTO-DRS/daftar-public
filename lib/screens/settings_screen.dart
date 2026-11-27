@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show Clipboard;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flutter/material.dart';
+import '../services/digest_notifier.dart';
 import '../services/pdf_service.dart' show PdfTemplate, PdfTemplateX;
 import '../utils/brand_color.dart';
 import 'about_screen.dart';
@@ -55,6 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _hide = true;
   bool _arabicDigits = SettingsService.instance.arabicDigits;
   bool _appLock = SettingsService.instance.appLock;
+  bool _digestNotify = SettingsService.instance.weeklyDigestNotify;
   bool _lockSupported = false;
 
   void _save() {
@@ -414,6 +416,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: _arabicDigits,
           onChanged: (v) => setState(() => _arabicDigits = v),
         ),
+        if (DigestNotifier.supported)
+          SwitchListTile(
+            key: const ValueKey('digest-notify'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('تذكير أسبوعي بالملخص'),
+            subtitle: const Text('إشعار مرة كل أسبوع (يبدأ من لحظة التفعيل) يطلب إذن الإشعارات'),
+            value: _digestNotify,
+            onChanged: (v) async {
+              final messenger = ScaffoldMessenger.of(context);
+              if (v) {
+                final ok = await DigestNotifier.instance.enable();
+                if (!ok) {
+                  messenger.showSnackBar(const SnackBar(
+                      content: Text('لم يُمنح إذن الإشعارات. فعّله من إعدادات الهاتف.')));
+                  return;
+                }
+              } else {
+                await DigestNotifier.instance.disable();
+              }
+              SettingsService.instance.weeklyDigestNotify = v;
+              setState(() => _digestNotify = v);
+            },
+          ),
         if (_lockSupported)
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

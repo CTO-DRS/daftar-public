@@ -130,6 +130,9 @@ class SettingsService {
     _p.setString('reorder_snooze', jsonEncode(m));
   }
 
+  bool get weeklyDigestNotify => _p.getBool('weekly_digest_notify') ?? false;
+  set weeklyDigestNotify(bool v) => _p.setBool('weekly_digest_notify', v);
+
   bool get appLock => _p.getBool('app_lock') ?? false;
   set appLock(bool v) => _p.setBool('app_lock', v);
 
