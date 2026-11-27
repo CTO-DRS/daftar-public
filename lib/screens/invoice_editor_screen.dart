@@ -6,6 +6,7 @@ import '../database/app_database.dart';
 import '../models/invoice.dart';
 import '../models/invoice_item.dart';
 import '../utils/smart_items.dart';
+import '../utils/customer_defaults.dart';
 import '../services/editor_controller.dart';
 import '../services/settings_service.dart';
 import '../utils/date_utils.dart';
@@ -41,6 +42,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   List<InvoiceItem> _usual = [];
   int _lastCount = 0;
   String _usualFor = '';
+  String _defaultsFor = '';
   List<String> _partyNames = [];
 
   final _number = TextEditingController();
@@ -132,6 +134,41 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final l = await _db.lastInvoiceItems(name, excludeInvoiceId: inv.id);
     if (!mounted || _usualFor != name) return;
     setState(() { _usual = u; _lastCount = l.length; });
+    await _applyDefaults(name);
+  }
+
+  /// فاتورة جديدة فارغة لعميل معروف: يُملأ الاستحقاق والضريبة والعملة من عادته.
+  Future<void> _applyDefaults(String name) async {
+    final inv = _inv;
+    if (inv == null || widget.invoiceId != null || widget.draft != null) return;
+    if (inv.kind != DocKind.invoice || inv.isNote || inv.items.isNotEmpty) return;
+    if (_defaultsFor == name) return;
+    final d = computeDefaults(
+        await _db.recentInvoicesForParty(name, excludeInvoiceId: inv.id));
+    if (!mounted || d.isEmpty || _party.text.trim() != name) return;
+    _defaultsFor = name;
+    final said = <String>[];
+    if (d.dueDays != null && inv.dueDate == null) {
+      inv.dueDate = DateTime(inv.date.year, inv.date.month, inv.date.day)
+          .add(Duration(days: d.dueDays!));
+      said.add('استحقاق بعد ${d.dueDays} يوم');
+    }
+    if (d.vatRate != null && d.vatRate != inv.vatRate) {
+      inv.vatRate = d.vatRate!;
+      _vatCtl.text = d.vatRate == 0 ? '' : formatQty(d.vatRate!);
+      said.add(d.vatRate == 0 ? 'بدون ضريبة' : 'ضريبة ${formatQty(d.vatRate!)}%');
+    }
+    if (d.currency != null && _currencyCtl.text.trim().isEmpty) {
+      _currencyCtl.text = d.currency!;
+      inv.currency = d.currency!;
+      said.add('عملة ${d.currency}');
+    }
+    if (said.isEmpty) return;
+    _touch();
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('طُبّقت عادة العميل: ${said.join('، ')}'),
+        duration: const Duration(seconds: 5)));
   }
 
   void _addUsual(InvoiceItem it) {

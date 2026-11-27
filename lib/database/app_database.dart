@@ -682,6 +682,24 @@ extension CatalogQueries on AppDatabase {
     return [for (final e in inv.items) e.copy()..id = null..invoiceId = null..flagged = false];
   }
 
+  /// آخر فواتير العميل (الأحدث أولاً) لاستنتاج القيم المعتادة.
+  Future<List<Invoice>> recentInvoicesForParty(String party,
+      {int limit = 10, int? excludeInvoiceId}) async {
+    final p = party.trim();
+    if (p.isEmpty) return [];
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT id FROM invoices WHERE party = ? AND kind = 'invoice' "
+        "AND (? IS NULL OR id != ?) ORDER BY id DESC LIMIT ?",
+        [p, excludeInvoiceId, excludeInvoiceId, limit]);
+    final out = <Invoice>[];
+    for (final m in r) {
+      final inv = await getInvoice(m['id'] as int);
+      if (inv != null) out.add(inv);
+    }
+    return out;
+  }
+
   Future<Map<String, InvoiceItem>> itemCatalog() async {
     final d = await db;
     final r = await d.rawQuery(
