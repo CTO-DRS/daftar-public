@@ -8,6 +8,12 @@ import '../utils/number_utils.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/responsive.dart';
 import 'statement_screen.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:share_plus/share_plus.dart';
+import '../services/file_saver.dart';
+import '../utils/csv_export.dart';
+import '../utils/platform_utils.dart';
 
 /// الذكاء المالي: تنبيهات ذكية، توقع التحصيل، أعمار الديون، تصنيف العملاء، أفضل الأصناف.
 /// كل التحليل يتم على الجهاز بدون إنترنت.
@@ -54,11 +60,49 @@ class _InsightsScreenState extends State<InsightsScreen> {
     }
   }
 
+  Future<void> _exportCsv(String range) async {
+    final m = ScaffoldMessenger.of(context);
+    final now = DateTime.now();
+    final (from, to) = switch (range) {
+      'month' => (DateTime(now.year, now.month), DateTime(now.year, now.month + 1)),
+      'last' => (DateTime(now.year, now.month - 1), DateTime(now.year, now.month)),
+      'year' => (DateTime(now.year), DateTime(now.year + 1)),
+      _ => (DateTime(2000), DateTime(2100)),
+    };
+    try {
+      final all = await AppDatabase.instance.listInvoices();
+      final csv = accountantCsv(all, from, to);
+      final name = 'daftar-accountant-$range-${now.year}-${now.month.toString().padLeft(2, '0')}.csv';
+      final bytes = Uint8List.fromList(utf8.encode(csv));
+      final where = await FileSaver.saveToDownloads(bytes, name, mime: 'text/csv');
+      m.showSnackBar(SnackBar(content: Text('تم حفظ الملف في $where')));
+      if (!isDesktopPlatform) {
+        await SharePlus.instance.share(ShareParams(
+            files: [XFile.fromData(bytes, mimeType: 'text/csv', name: name)],
+            fileNameOverrides: [name]));
+      }
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text('تعذر التصدير: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = _r;
     return Scaffold(
-      appBar: AppBar(title: const Text('الذكاء المالي')),
+      appBar: AppBar(title: const Text('الذكاء المالي'), actions: [
+        PopupMenuButton<String>(
+          tooltip: 'تصدير للمحاسب (CSV)',
+          icon: const Icon(Icons.table_view_outlined),
+          onSelected: _exportCsv,
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'month', child: Text('تصدير هذا الشهر (CSV)')),
+            PopupMenuItem(value: 'last', child: Text('تصدير الشهر الماضي (CSV)')),
+            PopupMenuItem(value: 'year', child: Text('تصدير هذه السنة (CSV)')),
+            PopupMenuItem(value: 'all', child: Text('تصدير الكل (CSV)')),
+          ],
+        ),
+      ]),
       body: r == null
           ? const Center(child: CircularProgressIndicator())
           : r.isEmpty
