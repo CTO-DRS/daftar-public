@@ -38,6 +38,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _headerOpen = true;
   Map<String, InvoiceItem> _catalog = {};
   List<ItemStat> _stats = [];
+  List<InvoiceItem> _usual = [];
+  int _lastCount = 0;
+  String _usualFor = '';
   List<String> _partyNames = [];
 
   final _number = TextEditingController();
@@ -99,6 +102,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _inv = inv;
       _c = c;
     });
+    _loadUsual();
   }
 
   @override
@@ -112,6 +116,35 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   }
 
   void _touch() => _c!.markDirty();
+
+  /// «طلبه المعتاد»: يُحمَّل عندما يطابق الاسم عميلاً معروفاً.
+  Future<void> _loadUsual() async {
+    final name = _party.text.trim();
+    final inv = _inv;
+    if (inv == null || inv.kind == DocKind.expense || inv.kind == DocKind.inventory) return;
+    if (name == _usualFor) return;
+    _usualFor = name;
+    if (!_partyNames.contains(name)) {
+      if (_usual.isNotEmpty || _lastCount != 0) setState(() { _usual = []; _lastCount = 0; });
+      return;
+    }
+    final u = await _db.usualItems(name, excludeInvoiceId: inv.id);
+    final l = await _db.lastInvoiceItems(name, excludeInvoiceId: inv.id);
+    if (!mounted || _usualFor != name) return;
+    setState(() { _usual = u; _lastCount = l.length; });
+  }
+
+  void _addUsual(InvoiceItem it) {
+    _c!.addItems([it.copy()..id = null..invoiceId = null]);
+  }
+
+  Future<void> _repeatLast() async {
+    final l = await _db.lastInvoiceItems(_party.text, excludeInvoiceId: _inv?.id);
+    if (!mounted || l.isEmpty) return;
+    _c!.addItems(l);
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('أُضيف ${l.length} سطر من آخر فاتورة، عدّل الكميات')));
+  }
 
   void _syncHeader() {
     final inv = _inv!;
@@ -542,11 +575,17 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   if (q.isEmpty) return const Iterable<String>.empty();
                   return _partyNames.where((n) => n.contains(q) && n != q).take(6);
                 },
-                onSelected: (_) => _touch(),
+                onSelected: (_) {
+                  _touch();
+                  _loadUsual();
+                },
                 fieldViewBuilder: (c, ctl, fn, _) => TextField(
                   controller: ctl,
                   focusNode: fn,
-                  onChanged: (_) => _touch(),
+                  onChanged: (_) {
+                    _touch();
+                    _loadUsual();
+                  },
                   decoration: const InputDecoration(labelText: 'اسم العميل / المورد'),
                 ),
                 optionsViewBuilder: (c, onSel, opts) => Align(
@@ -568,6 +607,29 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   ),
                 ),
               ),
+              if (_usual.isNotEmpty && !inv.isNote) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Wrap(spacing: 8, runSpacing: 4, children: [
+                    if (_lastCount > 0)
+                      ActionChip(
+                        key: const ValueKey('repeat-last'),
+                        avatar: const Icon(Icons.replay, size: 16),
+                        label: const Text('كرر آخر فاتورة'),
+                        onPressed: _repeatLast,
+                      ),
+                    for (final u in _usual)
+                      ActionChip(
+                        key: ValueKey('usual-${u.description}'),
+                        avatar: const Icon(Icons.add, size: 16),
+                        label: Text(
+                            '${u.description}${u.unitPrice > 0 ? ' · ${formatMoney(u.unitPrice)}' : ''}'),
+                        onPressed: () => _addUsual(u),
+                      ),
+                  ]),
+                ),
+              ],
               if (inv.kind == DocKind.invoice && !inv.isNote) ...[
                 const SizedBox(height: 10),
                 Row(children: [

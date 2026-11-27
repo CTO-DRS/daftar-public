@@ -39,4 +39,25 @@ void main() {
     expect((await db.customerPrices('أحمد')).values.single, 3.5);
     expect(await db.customerPrices(''), isEmpty);
   });
+  test('usualItems ranks by frequency; lastInvoiceItems copies latest invoice', () async {
+    final db = AppDatabase.instance;
+    await (await db.db).delete('invoices');
+    await db.saveInvoice(Invoice(number: 'U-1', party: 'سعد', items: [
+      InvoiceItem(description: 'رز', quantity: 2, unitPrice: 10),
+      InvoiceItem(description: 'سكر', quantity: 1, unitPrice: 4)]));
+    await db.saveInvoice(Invoice(number: 'U-2', party: 'سعد', items: [
+      InvoiceItem(description: 'رز', quantity: 5, unitPrice: 11)]));
+    await db.saveInvoice(Invoice(number: 'U-3', party: 'غيره', items: [
+      InvoiceItem(description: 'شاي', quantity: 1, unitPrice: 3)]));
+    final u = await db.usualItems('سعد');
+    expect(u.map((e) => e.description).toList(), ['رز', 'سكر']);
+    expect(u.first.unitPrice, 11);
+    expect(u.first.quantity, 5);
+    expect(u.first.id, isNull);
+    final l = await db.lastInvoiceItems('سعد');
+    expect(l.length, 1);
+    expect(l.first.quantity, 5);
+    expect(await db.usualItems('مجهول'), isEmpty);
+    expect(await db.lastInvoiceItems(''), isEmpty);
+  });
 }

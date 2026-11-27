@@ -637,6 +637,51 @@ extension CatalogQueries on AppDatabase {
     return out;
   }
 
+  /// أكثر الأصناف التي يطلبها هذا العميل (الأكثر تكراراً ثم الأحدث)، بآخر سعر وكمية له.
+  Future<List<InvoiceItem>> usualItems(String party,
+      {int limit = 5, int? excludeInvoiceId}) async {
+    final p = party.trim();
+    if (p.isEmpty) return [];
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT i.* FROM items i JOIN invoices v ON v.id = i.invoice_id "
+        "WHERE v.party = ? AND v.kind = 'invoice' AND TRIM(i.description) != '' "
+        "AND (? IS NULL OR v.id != ?) ORDER BY i.id ASC",
+        [p, excludeInvoiceId, excludeInvoiceId]);
+    final count = <String, int>{};
+    final last = <String, InvoiceItem>{};
+    final lastId = <String, int>{};
+    for (final m in r) {
+      final it = InvoiceItem.fromMap(m);
+      final k = normArabic(it.description);
+      count[k] = (count[k] ?? 0) + 1;
+      last[k] = it;
+      lastId[k] = it.id ?? 0;
+    }
+    final keys = count.keys.toList()
+      ..sort((a, b) {
+        final c = count[b]!.compareTo(count[a]!);
+        return c != 0 ? c : lastId[b]!.compareTo(lastId[a]!);
+      });
+    return [for (final k in keys.take(limit)) last[k]!.copy()..id = null..invoiceId = null];
+  }
+
+  /// أسطر آخر فاتورة لهذا العميل (نسخ جديدة بدون معرّفات) لزر «كرر آخر فاتورة».
+  Future<List<InvoiceItem>> lastInvoiceItems(String party,
+      {int? excludeInvoiceId}) async {
+    final p = party.trim();
+    if (p.isEmpty) return [];
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT id FROM invoices WHERE party = ? AND kind = 'invoice' "
+        "AND (? IS NULL OR id != ?) ORDER BY id DESC LIMIT 1",
+        [p, excludeInvoiceId, excludeInvoiceId]);
+    if (r.isEmpty) return [];
+    final inv = await getInvoice(r.first['id'] as int);
+    if (inv == null) return [];
+    return [for (final e in inv.items) e.copy()..id = null..invoiceId = null..flagged = false];
+  }
+
   Future<Map<String, InvoiceItem>> itemCatalog() async {
     final d = await db;
     final r = await d.rawQuery(

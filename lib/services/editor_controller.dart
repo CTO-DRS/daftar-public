@@ -90,6 +90,15 @@ class EditorController extends ChangeNotifier {
     if (count > 0) markDirty();
   }
 
+  /// يضيف أسطراً جاهزة (من «طلبه المعتاد» أو «كرر آخر فاتورة»).
+  void addItems(List<InvoiceItem> items) {
+    for (final it in items) {
+      inv.items.add(it);
+      _original.add(it);
+    }
+    if (items.isNotEmpty) markDirty();
+  }
+
   /// يحذف سطراً ويعيد موضعه للتراجع (-1 إن لم يوجد).
   int remove(InvoiceItem item) {
     final i = inv.items.indexOf(item);

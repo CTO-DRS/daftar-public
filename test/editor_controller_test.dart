@@ -112,4 +112,10 @@ void main() {
     expect(n, 2);
     expect(c.dirty, isFalse);
   });
+  test('addItems appends ready lines and marks dirty', () {
+    final c = EditorController(Invoice(number: 'X'));
+    c.addItems([InvoiceItem(description: 'a', quantity: 1, unitPrice: 2), InvoiceItem(description: 'b')]);
+    expect(c.inv.items.length, 2);
+    expect(c.dirty, isTrue);
+  });
 }
