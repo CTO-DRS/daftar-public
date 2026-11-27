@@ -115,6 +115,21 @@ class SettingsService {
     _p.setString('reminded', jsonEncode(m));
   }
 
+  /// تأجيل تنبيه «حان وقت طلبه» لكل عميل (الاسم ← ms).
+  Map<String, int> get reorderSnooze {
+    try {
+      final j = jsonDecode(_p.getString('reorder_snooze') ?? '{}') as Map;
+      return {for (final e in j.entries) e.key as String: (e.value as num).toInt()};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  void snoozeReorder(String party) {
+    final m = reorderSnooze..[party] = DateTime.now().millisecondsSinceEpoch;
+    _p.setString('reorder_snooze', jsonEncode(m));
+  }
+
   bool get appLock => _p.getBool('app_lock') ?? false;
   set appLock(bool v) => _p.setBool('app_lock', v);
 

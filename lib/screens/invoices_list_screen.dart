@@ -17,6 +17,8 @@ import '../services/sync_service.dart';
 import '../services/share_service.dart';
 import '../services/auto_backup.dart';
 import '../utils/forecast.dart';
+import '../utils/reorder.dart';
+import '../utils/customer_defaults.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'insights_screen.dart';
@@ -41,6 +43,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
   List<InvoiceSummary> _followUps = [];
   Map<String, ShareView> _views = {};
   List<StockForecast> _low = [];
+  List<ReorderDue> _reorder = [];
   Map<int, String> _uids = {};
   bool _loading = true;
   DashboardStats? _stats;
@@ -73,6 +76,68 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text('بعد التذكير تختفي الفاتورة من هنا 3 أيام ثم تعود إن بقيت غير مسددة.',
+                style: TextStyle(fontSize: 12)),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _newFromLast(ReorderDue r) async {
+    final db = AppDatabase.instance;
+    final items = await db.lastInvoiceItems(r.party);
+    final d = computeDefaults(await db.recentInvoicesForParty(r.party));
+    final inv = Invoice(
+      number: await db.nextNumber(),
+      party: r.party,
+      items: items,
+      vatRate: d.vatRate ?? SettingsService.instance.defaultVatRate,
+      currency: d.currency ?? '',
+    );
+    if (d.dueDays != null) {
+      final t = DateTime.now();
+      inv.dueDate = DateTime(t.year, t.month, t.day).add(Duration(days: d.dueDays!));
+    }
+    if (!mounted) return;
+    await Navigator.push(context,
+        MaterialPageRoute(builder: (_) => InvoiceEditorScreen(draft: inv)));
+    _load();
+  }
+
+  Future<void> _reorderSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (c) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('حان وقت طلبهم المعتاد',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          ),
+          for (final r in _reorder)
+            ListTile(
+              key: ValueKey('reorder-${r.party}'),
+              title: Text(r.party),
+              subtitle: Text(
+                  'يطلب كل ~${localizeDigits('${r.intervalDays}')} يوم • آخر طلب قبل ${localizeDigits('${r.daysSince}')} يوم'),
+              leading: const Icon(Icons.replay_circle_filled_outlined),
+              trailing: TextButton(
+                  onPressed: () {
+                    SettingsService.instance.snoozeReorder(r.party);
+                    Navigator.pop(c);
+                    _load();
+                  },
+                  child: const Text('لاحقاً')),
+              onTap: () {
+                Navigator.pop(c);
+                _newFromLast(r);
+              },
+            ),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('اضغط اسم العميل لتجهيز فاتورة بأصناف آخر طلب. «لاحقاً» تخفيه 7 أيام.',
                 style: TextStyle(fontSize: 12)),
           ),
         ]),
@@ -210,8 +275,10 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
         .where((e) => e.daysLeft != null && e.daysLeft! <= 7)
         .toList();
     final fu = dueForFollowUp(all, DateTime.now(), SettingsService.instance.reminded);
+    final ro = reorderDue(all, DateTime.now(), snoozed: SettingsService.instance.reorderSnooze);
     if (!mounted) return;
     setState(() {
+      _reorder = ro;
       _followUps = fu;
       _low = low;
       _stats = stats;
@@ -427,6 +494,23 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                 trailing: const Icon(Icons.chevron_left),
                 onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const InsightsScreen())),
+              ),
+            ),
+          ),
+        if (_reorder.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Card(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: ListTile(
+                leading: const Icon(Icons.replay_circle_filled_outlined),
+                title: Text('${localizeDigits('${_reorder.length}')} عملاء حان وقت طلبهم'),
+                subtitle: Text(
+                    _reorder.take(3).map((e) => e.party).join('، ') + (_reorder.length > 3 ? '…' : ''),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: _reorderSheet,
               ),
             ),
           ),
