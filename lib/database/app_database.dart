@@ -10,6 +10,8 @@ import '../utils/insights.dart';
 import '../utils/pricing.dart';
 import '../utils/recurrence.dart';
 import '../models/invoice_item.dart';
+import '../utils/smart_items.dart';
+import '../utils/auto_fill.dart' show normArabic;
 import '../models/party.dart';
 import '../services/settings_service.dart';
 
@@ -601,6 +603,38 @@ extension CatalogQueries on AppDatabase {
         "WHERE TRIM(i2.description) != '' AND v2.kind IN ('invoice','quote') "
         "GROUP BY LOWER(TRIM(i2.description))) t ON i.id = t.mid");
     return {for (final m in r) (m['description'] as String).trim(): InvoiceItem.fromMap(m)};
+  }
+
+  /// كل صنف بالاسم مع آخر نسخة منه وعدد مرات استخدامه (للاقتراحات الذكية).
+  Future<List<ItemStat>> itemStats() async {
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT i.*, t.cnt AS cnt FROM items i "
+        "JOIN (SELECT MAX(i2.id) mid, COUNT(*) cnt FROM items i2 JOIN invoices v2 ON v2.id = i2.invoice_id "
+        "WHERE TRIM(i2.description) != '' AND v2.kind IN ('invoice','quote') "
+        "GROUP BY LOWER(TRIM(i2.description))) t ON i.id = t.mid");
+    return [
+      for (final m in r)
+        ItemStat(InvoiceItem.fromMap(m), (m['cnt'] as num?)?.toInt() ?? 1)
+    ];
+  }
+
+  /// آخر سعر بيع لكل صنف (بالاسم المطبّع) لعميل معيّن.
+  Future<Map<String, double>> customerPrices(String party) async {
+    final p = party.trim();
+    if (p.isEmpty) return {};
+    final d = await db;
+    final r = await d.rawQuery(
+        "SELECT i.description, i.unit_price FROM items i JOIN invoices v ON v.id = i.invoice_id "
+        "WHERE v.party = ? AND v.kind IN ('invoice','quote') AND i.unit_price > 0 "
+        "AND TRIM(i.description) != '' ORDER BY i.id ASC",
+        [p]);
+    final out = <String, double>{};
+    for (final m in r) {
+      out[normArabic(m['description'] as String)] =
+          (m['unit_price'] as num).toDouble();
+    }
+    return out;
   }
 
   Future<Map<String, InvoiceItem>> itemCatalog() async {

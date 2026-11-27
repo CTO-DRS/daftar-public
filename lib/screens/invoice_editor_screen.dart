@@ -5,6 +5,7 @@ import '../widgets/empty_state.dart';
 import '../database/app_database.dart';
 import '../models/invoice.dart';
 import '../models/invoice_item.dart';
+import '../utils/smart_items.dart';
 import '../services/editor_controller.dart';
 import '../services/settings_service.dart';
 import '../utils/date_utils.dart';
@@ -36,6 +37,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   EditorController? _c;
   bool _headerOpen = true;
   Map<String, InvoiceItem> _catalog = {};
+  List<ItemStat> _stats = [];
   List<String> _partyNames = [];
 
   final _number = TextEditingController();
@@ -80,6 +82,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       );
     }
     _catalog = await _db.itemCatalog();
+    _stats = await _db.itemStats();
     _partyNames = await _db.partyNames();
     _number.text = inv.number;
     _party.text = inv.party;
@@ -157,6 +160,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     var isNew = current == null;
     while (true) {
       final item = current ?? _c!.blank();
+      final cprices = await _db.customerPrices(_party.text);
+      if (!mounted) return;
       final r = await showItemEditSheet(
         context,
         item: item,
@@ -164,6 +169,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         pinPrice: _pinPrice,
         pinType: _pinType,
         catalog: _catalog,
+        stats: _stats,
+        customerPrices: cprices,
       );
       if (r == null || !mounted) return;
       _c!.applyEdit(isNew ? null : item, r.item,

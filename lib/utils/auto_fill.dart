@@ -77,3 +77,6 @@ int enrichItems(List<InvoiceItem> items, Map<String, InvoiceItem> history) {
   }
   return filled;
 }
+
+/// تطبيع عربي للمطابقة (همزات، تشكيل، ة/ه، ى/ي، مسافات).
+String normArabic(String s) => _n(s);

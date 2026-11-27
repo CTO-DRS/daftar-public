@@ -24,4 +24,19 @@ void main() {
     expect(h['شاي']!.unitPrice, 5);
     expect(h['شاي']!.unit, 'علبة');
   });
+  test('itemStats counts uses; customerPrices returns that customer\'s last price', () async {
+    final db = AppDatabase.instance;
+    await (await db.db).delete('invoices');
+    await db.saveInvoice(Invoice(number: 'S-1', party: 'أحمد', items: [InvoiceItem(description: 'سكر', quantity: 1, unitPrice: 4)]));
+    await db.saveInvoice(Invoice(number: 'S-2', party: 'خالد', items: [InvoiceItem(description: 'سكر', quantity: 1, unitPrice: 6)]));
+    await db.saveInvoice(Invoice(number: 'S-3', party: 'أحمد', items: [InvoiceItem(description: 'سكر', quantity: 1, unitPrice: 3.5)]));
+    final st = await db.itemStats();
+    expect(st.length, 1);
+    expect(st.first.count, 3);
+    expect(st.first.last.unitPrice, 3.5);
+    final cp = await db.customerPrices('خالد');
+    expect(cp.values.single, 6);
+    expect((await db.customerPrices('أحمد')).values.single, 3.5);
+    expect(await db.customerPrices(''), isEmpty);
+  });
 }

@@ -6,6 +6,8 @@ import '../database/app_database.dart';
 import '../models/invoice_item.dart';
 import '../utils/pricing.dart';
 import '../utils/number_utils.dart';
+import '../utils/smart_items.dart';
+import '../utils/auto_fill.dart' show normArabic;
 
 class ItemEditResult {
   final InvoiceItem item;
@@ -23,6 +25,8 @@ Future<ItemEditResult?> showItemEditSheet(
   required bool pinPrice,
   required bool pinType,
   Map<String, InvoiceItem> catalog = const {},
+  List<ItemStat> stats = const [],
+  Map<String, double> customerPrices = const {},
 }) {
   return showModalBottomSheet<ItemEditResult>(
     context: context,
@@ -33,7 +37,9 @@ Future<ItemEditResult?> showItemEditSheet(
         isNew: isNew,
         pinPrice: pinPrice,
         pinType: pinType,
-        catalog: catalog),
+        catalog: catalog,
+        stats: stats,
+        customerPrices: customerPrices),
   );
 }
 
@@ -43,8 +49,12 @@ class _ItemEditSheet extends StatefulWidget {
   final bool pinPrice;
   final bool pinType;
   final Map<String, InvoiceItem> catalog;
+  final List<ItemStat> stats;
+  final Map<String, double> customerPrices;
   const _ItemEditSheet(
       {required this.catalog,
+      this.stats = const [],
+      this.customerPrices = const {},
       required this.item,
       required this.isNew,
       required this.pinPrice,
@@ -159,6 +169,42 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
     });
   }
 
+  List<ItemStat> _sugg = [];
+  String? _specialNote;
+
+  void _suggest(String v) {
+    final next = widget.isNew || widget.item.description.isEmpty
+        ? suggestItems(v, widget.stats)
+        : <ItemStat>[];
+    setState(() => _sugg = next);
+  }
+
+  void _pickSuggestion(ItemStat s) {
+    final tmp = InvoiceItem(
+        itemCode: _code.text.trim(),
+        refNumber: _ref.text.trim(),
+        unit: _unit.text.trim(),
+        packSize: parseNumber(_pack.text) ?? 0,
+        costPrice: parseNumber(_cost.text) ?? 0,
+        unitPrice: parseNumber(_price.text) ?? 0,
+        wholesaleUnit: _wUnit.text.trim());
+    final cp = widget.customerPrices[normArabic(s.last.description)];
+    final special = applySuggestion(tmp, s.last, customerPrice: cp);
+    setState(() {
+      _type.text = tmp.description;
+      _code.text = tmp.itemCode;
+      _ref.text = tmp.refNumber;
+      _unit.text = tmp.unit;
+      if (tmp.packSize > 0) _pack.text = plainNumber(tmp.packSize);
+      if (tmp.costPrice > 0) _cost.text = plainNumber(tmp.costPrice);
+      if (tmp.unitPrice > 0) _price.text = plainNumber(tmp.unitPrice);
+      _wUnit.text = tmp.wholesaleUnit;
+      _specialNote = special ? 'آخر سعر لهذا العميل: ${plainNumber(tmp.unitPrice)}' : null;
+      _sugg = [];
+    });
+    _loadTiers();
+  }
+
   void _submit(bool addNext) {
     final it = widget.item.copy()
       ..itemCode = _code.text.trim()
@@ -239,12 +285,39 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
             Expanded(
                 child: TextField(
                     controller: _type,
-                    onChanged: (_) => _loadTiers(),
+                    onChanged: (v) {
+                      _loadTiers();
+                      _suggest(v);
+                    },
                     decoration:
                         const InputDecoration(labelText: 'النوع / الوصف'))),
             _pin(_pinType, () => setState(() => _pinType = !_pinType),
                 'تثبيت النوع'),
           ]),
+          if (_sugg.isNotEmpty)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Wrap(spacing: 8, runSpacing: 4, children: [
+                for (final s in _sugg)
+                  ActionChip(
+                    key: ValueKey('sugg-${s.last.description}'),
+                    avatar: const Icon(Icons.history, size: 16),
+                    label: Text(
+                        '${s.last.description}${s.last.unitPrice > 0 ? ' · ${plainNumber(widget.customerPrices[normArabic(s.last.description)] ?? s.last.unitPrice)}' : ''}'),
+                    onPressed: () => _pickSuggestion(s),
+                  ),
+              ]),
+            ),
+          if (_specialNote != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Chip(
+                    avatar: const Icon(Icons.person, size: 16),
+                    label: Text(_specialNote!)),
+              ),
+            ),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(
