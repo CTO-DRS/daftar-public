@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum OcrProvider { gemini, openrouter }
@@ -79,6 +80,21 @@ class SettingsService {
   set numberStart(int v) => _p.setInt('num_start', v < 1 ? 1 : v);
   int get numberPadding => _p.getInt('num_padding') ?? 1;
   set numberPadding(int v) => _p.setInt('num_padding', v.clamp(1, 8));
+
+  /// آخر وقت تذكير لكل فاتورة (رقم الفاتورة ← ms).
+  Map<String, int> get reminded {
+    try {
+      final j = jsonDecode(_p.getString('reminded') ?? '{}') as Map;
+      return {for (final e in j.entries) e.key as String: (e.value as num).toInt()};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  void markReminded(String number) {
+    final m = reminded..[number] = DateTime.now().millisecondsSinceEpoch;
+    _p.setString('reminded', jsonEncode(m));
+  }
 
   bool get appLock => _p.getBool('app_lock') ?? false;
   set appLock(bool v) => _p.setBool('app_lock', v);

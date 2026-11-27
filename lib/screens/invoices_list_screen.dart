@@ -12,6 +12,7 @@ import '../utils/date_utils.dart';
 import '../utils/number_utils.dart';
 import 'invoice_editor_screen.dart';
 import 'quick_invoice_screen.dart';
+import '../utils/followup.dart';
 import 'scan_flow.dart';
 import 'parties_screen.dart';
 import 'insights_screen.dart';
@@ -33,8 +34,44 @@ class InvoicesListScreen extends StatefulWidget {
 class _InvoicesListScreenState extends State<InvoicesListScreen> {
   final _search = TextEditingController();
   List<InvoiceSummary> _items = [];
+  List<InvoiceSummary> _followUps = [];
   bool _loading = true;
   DashboardStats? _stats;
+
+  Future<void> _followUpSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (c) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('متابعة المتأخرات',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          ),
+          for (final s in _followUps)
+            ListTile(
+              title: Text(s.invoice.party.isEmpty ? s.invoice.number : s.invoice.party),
+              subtitle: Text(
+                  '${s.invoice.number} • متأخرة ${localizeDigits('${DateTime.now().difference(s.invoice.dueDate!).inDays}')} يوماً • المتبقي ${formatMoney(paymentRemaining(s.grandTotal, s.invoice.paidAmount, s.invoice.status))}'),
+              trailing: const Icon(Icons.send_outlined),
+              onTap: () async {
+                Navigator.pop(c);
+                await _remind(s);
+                SettingsService.instance.markReminded(s.invoice.number);
+                _load();
+              },
+            ),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('بعد التذكير تختفي الفاتورة من هنا 3 أيام ثم تعود إن بقيت غير مسددة.',
+                style: TextStyle(fontSize: 12)),
+          ),
+        ]),
+      ),
+    );
+  }
 
   Future<void> _remind(InvoiceSummary s) async {
     final inv = s.invoice;
@@ -111,8 +148,10 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
         : await AppDatabase.instance.listInvoices();
     final stats = computeDashboard(all, DateTime.now(),
         currency: SettingsService.instance.currency);
+    final fu = dueForFollowUp(all, DateTime.now(), SettingsService.instance.reminded);
     if (!mounted) return;
     setState(() {
+      _followUps = fu;
       _stats = stats;
       _items = list;
       _loading = false;
@@ -294,6 +333,21 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
         if (_stats != null && _stats!.hasData)
           DashboardHeader(
               stats: _stats!, currency: SettingsService.instance.currency),
+        if (_followUps.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: ListTile(
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: Text(
+                    '${localizeDigits('${_followUps.length}')} فواتير متأخرة تحتاج متابعة'),
+                subtitle: const Text('اضغط لإرسال تذكير مهذب بالواتساب'),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: _followUpSheet,
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: TextField(
