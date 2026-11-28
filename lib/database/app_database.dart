@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:path/path.dart' as p;
+import '../utils/number_utils.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/invoice.dart';
@@ -590,9 +591,11 @@ class AppDatabase {
     final rows = await d.query('invoices', columns: ['number']);
     var max = st.numberStart - 1;
     for (final r in rows) {
-      final n = (r['number'] as String).trim();
-      if (!n.startsWith(prefix)) continue;
-      final v = int.tryParse(n.substring(prefix.length));
+      // الأرقام العربية-الهندية (كُتب الرقم بها يدوياً) تُحتسب أيضاً حتى لا يتكرر الترقيم.
+      final n = normalizeDigits((r['number'] as String).trim());
+      final pf = normalizeDigits(prefix);
+      if (!n.startsWith(pf)) continue;
+      final v = int.tryParse(n.substring(pf.length));
       if (v != null && v > max) max = v;
     }
     return formatInvoiceNumber(prefix, max + 1, st.numberPadding);
