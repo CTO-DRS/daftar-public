@@ -24,4 +24,10 @@ void main() {
         [CountRow('x', 'x', 5, DateTime(2026, 1, 1))], [], DateTime(2026, 11, 27));
     expect(out, isEmpty);
   });
+  test('stockKey joins by model code even when names differ, and aliases name-only rows', () {
+    final alias = buildNameToCode([('بناجر بناتي أوميغا', 'W-2130'), ('بناجر بناتي', '')]);
+    expect(stockKey('اسم مختلف', 'w2130', alias), stockKey('بناجر بناتي أوميغا', 'W-2130', alias));
+    expect(stockKey('بناجر بناتي أوميغا', '', alias), 'c:W2130');
+    expect(stockKey('مجهول', '', alias), 'n:مجهول');
+  });
 }

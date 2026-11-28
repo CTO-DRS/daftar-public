@@ -293,14 +293,14 @@ class AppDatabase {
   Future<List<StockForecast>> stockForecast(DateTime now) async {
     final d = await db;
     final c = await d.rawQuery('''
-      SELECT LOWER(TRIM(i.description)) AS k, TRIM(i.description) AS name,
+      SELECT i.item_code AS code, TRIM(i.description) AS name,
              (i.quantity + i.wholesale_qty * CASE WHEN i.pack_size > 0 THEN i.pack_size ELSE 1 END) AS qty,
              v.date AS date, i.pack_size AS pack
       FROM items i JOIN invoices v ON v.id = i.invoice_id
       WHERE v.kind = 'inventory' AND TRIM(i.description) != ''
     ''');
     final s = await d.rawQuery('''
-      SELECT LOWER(TRIM(i.description)) AS k,
+      SELECT i.item_code AS code, TRIM(i.description) AS name,
              (CASE WHEN v.note_type = 'credit' THEN -1 ELSE 1 END) *
              (i.quantity + i.wholesale_qty * CASE WHEN i.pack_size > 0 THEN i.pack_size ELSE 1 END) AS pieces,
              v.date AS date
@@ -308,9 +308,13 @@ class AppDatabase {
       WHERE v.kind = 'invoice' AND v.status != 'draft' AND TRIM(i.description) != ''
     ''');
     DateTime dt(Object? v) => DateTime.fromMillisecondsSinceEpoch((v as int?) ?? 0);
+    final alias = buildNameToCode([
+      for (final m in [...c, ...s]) (m['name'] as String, (m['code'] as String?) ?? '')
+    ]);
+    String key(Map<String, Object?> m) => stockKey(m['name'] as String, (m['code'] as String?) ?? '', alias);
     return computeStockForecast(
-      [for (final m in c) CountRow(m['k'] as String, m['name'] as String, (m['qty'] as num).toDouble(), dt(m['date']), packSize: (m['pack'] as num?)?.toDouble() ?? 0)],
-      [for (final m in s) SaleRow(m['k'] as String, (m['pieces'] as num).toDouble(), dt(m['date']))],
+      [for (final m in c) CountRow(key(m), m['name'] as String, (m['qty'] as num).toDouble(), dt(m['date']), packSize: (m['pack'] as num?)?.toDouble() ?? 0)],
+      [for (final m in s) SaleRow(key(m), (m['pieces'] as num).toDouble(), dt(m['date']))],
       now,
     );
   }

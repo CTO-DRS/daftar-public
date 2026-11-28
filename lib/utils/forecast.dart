@@ -63,3 +63,25 @@ List<StockForecast> computeStockForecast(
   out.sort((a, b) => (a.daysLeft ?? 1e9).compareTo(b.daysLeft ?? 1e9));
   return out;
 }
+
+/// مفتاح موحّد للصنف: كود الموديل إن وُجد (يتجاهل الشرطة والمسافات وحالة الأحرف)،
+/// وإلا الاسم. يُستخدم لربط الجرد بالمبيعات حتى لو اختلف كتابة الاسم.
+String stockKey(String name, String code, Map<String, String> nameToCode) {
+  String norm(String c) => c.toUpperCase().replaceAll(RegExp(r'[\s\-_/.]'), '');
+  final c = norm(code.trim());
+  final n = name.trim().toLowerCase();
+  if (c.isNotEmpty) return 'c:$c';
+  final alias = nameToCode[n];
+  if (alias != null && alias.isNotEmpty) return 'c:${norm(alias)}';
+  return 'n:$n';
+}
+
+/// يبني خريطة اسم ← كود من كل الأسطر المعروفة (الاسم الذي ظهر مرة مع كود).
+Map<String, String> buildNameToCode(Iterable<(String, String)> rows) {
+  final m = <String, String>{};
+  for (final r in rows) {
+    final n = r.$1.trim().toLowerCase();
+    if (n.isNotEmpty && r.$2.trim().isNotEmpty) m[n] = r.$2;
+  }
+  return m;
+}
