@@ -343,7 +343,9 @@ InvoiceItem? _parseLine(String chunk, List<InvoiceItem> catalog) {
       hit = c;
       break;
     }
-    if (hit == null && (nc.contains(nd) || nd.contains(nc))) hit = c;
+    final short = nc.length < nd.length ? nc : nd;
+    final digitsSame = nc.replaceAll(RegExp(r'[^0-9]'), '') == nd.replaceAll(RegExp(r'[^0-9]'), '');
+    if (hit == null && short.length >= 3 && digitsSame && (nc.contains(nd) || nd.contains(nc))) hit = c;
   }
   if (hit != null) {
     item.description = hit.description;

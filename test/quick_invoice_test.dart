@@ -77,4 +77,11 @@ void voiceParserTests() {
     final two = parseQuickInvoice('عشرين كولا وثلاثين عصير').items;
     expect(two.map((e) => e.quantity), [20, 30]);
   });
+  test('catalog partial match ignores items that differ by a number', () {
+    final cat = [InvoiceItem(description: 'كولا 330', unitPrice: 2)];
+    final it = parseQuickInvoice('5 كولا 355', catalog: cat).items.single;
+    expect(it.unitPrice, 0);
+    final ok = parseQuickInvoice('5 كولا 330', catalog: cat).items.single;
+    expect(ok.unitPrice, 2);
+  });
 }
