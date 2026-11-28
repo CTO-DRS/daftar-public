@@ -69,8 +69,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _oModel.text.isEmpty ? SettingsService.freeVisionModels.first : _oModel.text;
     s.numberPrefix = _prefix.text;
     s.inventoryPrefix = _prefixInv.text;
-    s.sellerVat = normalizeDigits(_vatNo.text);
-    s.defaultVatRate = _vatOn ? 15 : 0;
+    s.sellerVat = normalizeDigits(_vatNo.text).replaceAll(RegExp(r'[^0-9]'), '');
+    s.defaultVatRate = _vatOn ? (s.defaultVatRate > 0 ? s.defaultVatRate : 15) : 0; // لا نكتب فوق نسبة مخصّصة
     s.numberStart = parseNumber(_start.text)?.toInt() ?? 1;
     s.numberPadding = parseNumber(_pad.text)?.toInt() ?? 1;
     s.provider = _provider;
