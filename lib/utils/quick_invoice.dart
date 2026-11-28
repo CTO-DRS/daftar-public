@@ -136,7 +136,95 @@ QuickInvoice parseQuickInvoice(String text,
   return QuickInvoice(party, items, repeatLast: repeatLast, vatRate: vat);
 }
 
+String _codeKey(String s) => normalizeDigits(s).toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+/// سطر منظَّم من قائمة مسح/جرد: «النوع – موديل W-2130 – عدد 56 كرتون/باكت – الباكت 12 × 6 حبات».
+/// النوع ← الوصف، الموديل ← كود الصنف، العدد ← الكمية بوحدتها، حجم العبوة ← packSize.
+/// الأسعار من آخر صنف بنفس الكود (أو الاسم) في الكتالوج.
+InvoiceItem? _parseStructuredLine(String chunk, List<InvoiceItem> catalog) {
+  final segs = chunk
+      .split(RegExp(r'\s+[–—-]\s+|\s*[–—]\s*'))
+      .map((e) => e.trim().replaceFirst(RegExp(r'[.。]+$'), '').trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+  if (segs.length < 2) return null;
+  final modelSeg = segs.indexWhere((e) => RegExp(r'^(?:ال)?موديل(?=\s|$)').hasMatch(e));
+  final qtySeg = segs.indexWhere((e) => RegExp(r'^عدد(?=\s|$)').hasMatch(e));
+  if (modelSeg < 0 && qtySeg < 0) return null;
+  final name = segs.first;
+  if (RegExp(r'^(?:ال)?موديل(?=\s|$)|^عدد(?=\s|$)').hasMatch(name)) return null;
+  var code = '';
+  if (modelSeg >= 0) {
+    code = segs[modelSeg].replaceFirst(RegExp(r'^(?:ال)?موديل\s*'), '').trim();
+  }
+  var qty = 1.0, qtyFound = false;
+  var unit = '';
+  final notes = <String>[];
+  if (qtySeg >= 0) {
+    final body = segs[qtySeg].replaceFirst(RegExp(r'^عدد\s*'), '');
+    final paren = RegExp(r'[\(（]([^\)）]*)[\)）]').firstMatch(body);
+    if (paren != null) notes.add(paren.group(1)!.trim());
+    final plain = paren == null ? body : body.replaceFirst(paren.group(0)!, ' ');
+    final nums = RegExp(r'\d+(?:\.\d+)?').allMatches(normalizeDigits(plain)).toList();
+    if (nums.isNotEmpty) {
+      qty = nums.fold<double>(1, (a, m) => a * double.parse(m.group(0)!));
+      qtyFound = true;
+      final after = plain.substring(plain.indexOf(RegExp(r'[^\d\s×xX*.]'), nums.last.end).clamp(0, plain.length)).trim();
+      final firstWord = after.split(RegExp(r'[\s/،,]+')).firstWhere((e) => e.isNotEmpty, orElse: () => '');
+      unit = _unit(firstWord) ?? '';
+    }
+  }
+  var pack = 0.0;
+  for (var k = 0; k < segs.length; k++) {
+    if (k == 0 || k == modelSeg || k == qtySeg) continue;
+    final m = RegExp(r'^ال\S+\s+(\d+(?:\.\d+)?)(?:\s*[×xX*]\s*(\d+(?:\.\d+)?))?').firstMatch(normalizeDigits(segs[k]));
+    if (m != null) {
+      pack = double.parse(m.group(1)!) * (m.group(2) == null ? 1 : double.parse(m.group(2)!));
+    } else {
+      notes.add(segs[k]);
+    }
+  }
+  final item = InvoiceItem(description: name, itemCode: code, quantity: qty, unit: unit, packSize: pack);
+  if (!qtyFound) item.flagged = true;
+  InvoiceItem? hit;
+  final ck = _codeKey(code);
+  if (ck.isNotEmpty) {
+    for (final c in catalog) {
+      if (_codeKey(c.itemCode) == ck) {
+        hit = c;
+        break;
+      }
+    }
+  }
+  if (hit == null) {
+    final nd = _norm(name);
+    for (final c in catalog) {
+      if (_norm(c.description) == nd && nd.isNotEmpty) {
+        hit = c;
+        break;
+      }
+    }
+  }
+  if (hit != null) {
+    if (hit.itemCode.isNotEmpty) item.itemCode = hit.itemCode;
+    if (item.unit.isEmpty) item.unit = hit.unit;
+    if (item.packSize == 0) item.packSize = hit.packSize;
+    item.unitPrice = hit.unitPrice;
+    item.costPrice = hit.costPrice;
+  }
+  item.notes = notes.join(' • ');
+  if ((item.unit == 'كرتون' || item.unit == 'درزن') && item.packSize > 0 && qtyFound) {
+    item.wholesaleQty = qty;
+    item.wholesaleUnit = item.unit;
+    item.wholesalePrice = item.unitPrice * item.packSize;
+    item.quantity = 0;
+  }
+  return item;
+}
+
 InvoiceItem? _parseLine(String chunk, List<InvoiceItem> catalog) {
+  final structured = _parseStructuredLine(chunk, catalog);
+  if (structured != null) return structured;
   var s = chunk;
   double? price;
   final pm = RegExp(r'(?:بسعر|سعره|سعرها|بـ|ب)\s*(\d+(?:\.\d+)?)\s*(?:ريال|ر\.س|رس|ر)?\s*$')
