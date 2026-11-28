@@ -361,6 +361,17 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
           ),
           ListTile(
             minTileHeight: 56,
+            leading: const Icon(Icons.draw_outlined),
+            title: const Text('مسح قائمة بخط اليد'),
+            subtitle: const Text('النوع | الموديل | العدد (كراتين×دزن)'),
+            onTap: () async {
+              Navigator.pop(c);
+              final saved = await startScanFlow(context, handwritten: true);
+              if (saved) _load();
+            },
+          ),
+          ListTile(
+            minTileHeight: 56,
             leading: const Icon(Icons.request_quote_outlined),
             title: const Text('عرض سعر جديد'),
             onTap: () => Navigator.pop(c, DocKind.quote),

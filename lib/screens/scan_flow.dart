@@ -11,7 +11,7 @@ import 'scan_verification_screen.dart';
 
 /// مسار المسح: التقاط/اختيار صورة، قص وتدوير، ثم شاشة المراجعة.
 /// يعيد true إذا اعتمد المستخدم الفاتورة وحُفظت.
-Future<bool> startScanFlow(BuildContext context, {DocKind kind = DocKind.invoice}) async {
+Future<bool> startScanFlow(BuildContext context, {DocKind kind = DocKind.invoice, bool handwritten = false}) async {
   final source = !isMobilePlatform
       ? ImageSource.gallery
       : await showModalBottomSheet<ImageSource>(
@@ -68,7 +68,7 @@ Future<bool> startScanFlow(BuildContext context, {DocKind kind = DocKind.invoice
     // تحسين التباين وتصغير الحجم قبل المعالجة.
     final processed = await OcrService.preprocess(File(cropped.path));
     final saved = await nav.push<bool>(MaterialPageRoute(
-        builder: (_) => ScanVerificationScreen(image: processed, kind: kind)));
+        builder: (_) => ScanVerificationScreen(image: processed, kind: kind, handwritten: handwritten)));
     return saved ?? false;
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('تعذر فتح الصورة: $e')));

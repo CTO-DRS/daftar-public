@@ -11,6 +11,7 @@ import 'package:image/image.dart' as img;
 import '../models/invoice_item.dart';
 import '../models/ocr_result.dart';
 import '../utils/date_utils.dart';
+import '../utils/handwritten_list.dart';
 import '../utils/number_utils.dart';
 import '../utils/ocr_parsing.dart';
 import '../utils/platform_utils.dart';
@@ -68,11 +69,12 @@ class OcrService {
   }
 
   /// المحرك الرئيسي: AI إن توفر مفتاح وإنترنت، وإلا الرجوع للمسح المحلي.
-  Future<OcrResult> scan(File image) async {
+  Future<OcrResult> scan(File image,
+      {bool handwritten = false, Map<String, InvoiceItem> catalog = const {}}) async {
     final warnings = <String>[];
     if (_settings.apiKey.isNotEmpty) {
       try {
-        final r = await _scanOnline(image);
+        final r = await _scanOnline(image, handwritten: handwritten, catalog: catalog);
         verifyItems(r.items);
         return r;
       } on SocketException {
@@ -98,7 +100,9 @@ class OcrService {
     );
   }
 
-  Future<OcrResult> _scanOnline(File image) async {
+  Future<OcrResult> _scanOnline(File image,
+      {bool handwritten = false, Map<String, InvoiceItem> catalog = const {}}) async {
+    final prompt = handwritten ? kHandwrittenPrompt : kOcrPrompt;
     final b64 = base64Encode(await image.readAsBytes());
     final prov = _settings.provider;
     final key = _settings.apiKey;
@@ -117,7 +121,7 @@ class OcrService {
               'contents': [
                 {
                   'parts': [
-                    {'text': kOcrPrompt},
+                    {'text': prompt},
                     {
                       'inline_data': {'mime_type': 'image/jpeg', 'data': b64}
                     },
@@ -144,7 +148,7 @@ class OcrService {
       text = '';
       for (final model in chain) {
         try {
-          text = await _openrouterCall(model, b64, key);
+          text = await _openrouterCall(model, b64, key, prompt);
           if (text.trim().isNotEmpty) break;
           last = OcrException('رد فارغ من الخدمة.');
         } on OcrException catch (e) {
@@ -161,11 +165,19 @@ class OcrService {
       if (text.trim().isEmpty && last != null) throw last;
     }
     if (text.trim().isEmpty) throw OcrException('رد فارغ من الخدمة.');
+    if (handwritten) {
+      final j = extractJsonObject(text);
+      return OcrResult(
+        source: prov == OcrProvider.gemini ? OcrSource.gemini : OcrSource.openrouter,
+        party: (j['party'] ?? '').toString().trim(),
+        items: buildHandwrittenItems(handwrittenRows(text), catalog),
+      );
+    }
     return parseOnlineResponse(text,
         prov == OcrProvider.gemini ? OcrSource.gemini : OcrSource.openrouter);
   }
 
-  Future<String> _openrouterCall(String model, String b64, String key) async {
+  Future<String> _openrouterCall(String model, String b64, String key, String prompt) async {
     final res = await _client
         .post(
           Uri.https('openrouter.ai', '/api/v1/chat/completions'),
@@ -180,7 +192,7 @@ class OcrService {
               {
                 'role': 'user',
                 'content': [
-                  {'type': 'text', 'text': kOcrPrompt},
+                  {'type': 'text', 'text': prompt},
                   {
                     'type': 'image_url',
                     'image_url': {'url': 'data:image/jpeg;base64,$b64'}

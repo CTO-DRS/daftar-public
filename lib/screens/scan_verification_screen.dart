@@ -20,7 +20,9 @@ import '../widgets/totals_bar.dart';
 class ScanVerificationScreen extends StatefulWidget {
   final File image;
   final DocKind kind;
-  const ScanVerificationScreen({super.key, required this.image, this.kind = DocKind.invoice});
+  final bool handwritten; // قائمة مكتوبة بخط اليد: النوع | الموديل | العدد
+  const ScanVerificationScreen(
+      {super.key, required this.image, this.kind = DocKind.invoice, this.handwritten = false});
 
   @override
   State<ScanVerificationScreen> createState() => _ScanVerificationScreenState();
@@ -56,7 +58,9 @@ class _ScanVerificationScreenState extends State<ScanVerificationScreen> {
       _error = null;
     });
     try {
-      final r = await OcrService().scan(widget.image);
+      final r = await OcrService().scan(widget.image,
+          handwritten: widget.handwritten,
+          catalog: widget.handwritten ? await AppDatabase.instance.itemCatalog() : const {});
       if (!mounted) return;
       final db = AppDatabase.instance;
       final known = await db.partyNames();
