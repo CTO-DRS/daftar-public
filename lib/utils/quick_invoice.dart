@@ -52,6 +52,46 @@ double? _num(String w) {
   return null;
 }
 
+/// «خمسة وعشرين» ← 25، «ميتين» ← 200: يدمج الأعداد المركبة قبل التقسيم.
+String _mergeCompoundNumbers(String t) {
+  final tens = <String, int>{
+    for (final e in _words.entries)
+      if (e.value >= 20 && e.value <= 90 && e.value % 10 == 0) _norm(e.key): e.value.toInt()
+  };
+  final ones = <String, int>{
+    for (final e in _words.entries)
+      if (e.value >= 1 && e.value <= 9) _norm(e.key): e.value.toInt()
+  };
+  final toks = t.split(' ');
+  final out = <String>[];
+  for (var i = 0; i < toks.length; i++) {
+    final a = _norm(toks[i]);
+    if (ones.containsKey(a) && i + 2 < toks.length) {
+      final wa = _norm(toks[i + 1]);
+      // «و» منفصلة: «خمسة و عشرين» أو ملتصقة: «خمسة وعشرين».
+      if (wa == 'و' && tens.containsKey(_norm(toks[i + 2]))) {
+        out.add('${ones[a]! + tens[_norm(toks[i + 2])]!}');
+        i += 2;
+        continue;
+      }
+    }
+    if (ones.containsKey(a) && i + 1 < toks.length) {
+      final nx = _norm(toks[i + 1]);
+      if (nx.startsWith('و') && tens.containsKey(nx.substring(1))) {
+        out.add('${ones[a]! + tens[nx.substring(1)]!}');
+        i += 1;
+        continue;
+      }
+    }
+    if (a == 'ميتين' || a == 'مئتين' || a == 'مايتين') {
+      out.add('200');
+      continue;
+    }
+    out.add(toks[i]);
+  }
+  return out.join(' ');
+}
+
 String? _unit(String w) {
   for (final e in _units.entries) {
     if (_norm(e.key) == _norm(w)) return e.value;
@@ -76,6 +116,7 @@ QuickInvoice parseQuickInvoice(String text,
     t = t.replaceFirst(rep, ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
     t = t.replaceFirst(RegExp(r'^[\s،,:-]+'), '');
   }
+  t = _mergeCompoundNumbers(t);
   // الضريبة المذكورة صوتياً.
   double? vat;
   final noVat = RegExp(r'(?:بدون|من غير|بلا)\s+ضريبة');

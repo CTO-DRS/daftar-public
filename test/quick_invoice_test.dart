@@ -70,4 +70,11 @@ void voiceParserTests() {
       expect(parseQuickInvoice('فاتورة لأحمد، 5 كولا').repeatLast, isFalse);
     });
   });
+  test('compound spoken numbers', () {
+    expect(parseQuickInvoice('خمسة وعشرين كولا').items.single.quantity, 25);
+    expect(parseQuickInvoice('اثنين وثلاثين حبة بيبسي').items.single.quantity, 32);
+    expect(parseQuickInvoice('ميتين كولا').items.single.quantity, 200);
+    final two = parseQuickInvoice('عشرين كولا وثلاثين عصير').items;
+    expect(two.map((e) => e.quantity), [20, 30]);
+  });
 }
