@@ -243,13 +243,23 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
     super.dispose();
   }
 
+  bool _syncFailShown = false;
+
   /// مزامنة صامتة إن كانت مفعّلة، ثم إعادة التحميل إذا نزل شيء.
   Future<void> _autoSync() async {
     if (!SyncService.instance.enabled) return;
     try {
       final r = await SyncService.instance.sync();
+      _syncFailShown = false;
       if (r.pulled + r.deleted > 0 && mounted) _load();
-    } catch (_) {}
+    } catch (_) {
+      // أخبر المستخدم مرة واحدة فقط (بدون إزعاج) أن المزامنة التلقائية فشلت.
+      if (mounted && !_syncFailShown) {
+        _syncFailShown = true;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('تعذّرت المزامنة التلقائية. بياناتك محفوظة على الجهاز وستُعاد المحاولة لاحقاً.')));
+      }
+    }
     _loadViews();
   }
 
