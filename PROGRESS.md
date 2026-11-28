@@ -11,3 +11,5 @@
 - Roadmap (1) stock-ledger reviewed: no defects found; unit conversion (dozen/carton sales) is by wholesale_qty*pack as designed.
 - Roadmap (2) done: quick-invoice catalog partial match requires >=3 chars and same digits (no wrong price pulled for 'كولا 355' vs 'كولا 330').
 - Roadmap (3) statement PDF checked: maxPages already set, no change.
+- Roadmap (4)(5): dashboard empty-data test added; onboarding already tested at 2x text scale.
+- v0.1.70+71 tagged (catalog match safety, dashboard test).
