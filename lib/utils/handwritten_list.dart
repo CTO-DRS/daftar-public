@@ -2,47 +2,53 @@ import '../models/invoice_item.dart';
 import 'number_utils.dart';
 import 'ocr_parsing.dart';
 
-/// مسح قوائم المخزون/التعبئة المكتوبة بخط اليد: أعمدة النوع | الموديل | العدد.
-/// الموديل هو كود الصنف. العدد يُكتب غالباً «كراتين×دزن» (1×61 = كرتون واحد و61 دزن).
+/// مسح قوائم المخزون المكتوبة بخط اليد (الصيغة الفعلية لقوائم المستخدم):
+/// النوع | الحبة/العدد في الباكت (مثل 12 × 6) | الموديل (مثل W-2130) | العدد (مثل 56 × 1 (كرتون/باكت)).
 const kHandwrittenPrompt = '''
-أنت محرك قراءة قوائم مخزون مكتوبة بخط اليد (عربي). الصورة جدول بثلاثة أعمدة: النوع | الموديل | العدد، وقد تكون مدوّرة أو مائلة.
+أنت محرك قراءة قوائم مخزون مكتوبة بخط اليد (عربي). الصورة جدول بأربعة أعمدة بهذا الترتيب: النوع | الحبة/العدد في الباكت | الموديل | العدد، وقد تكون مدوّرة أو مائلة.
 اقرأ كل صف بالترتيب، وأعد JSON فقط بدون أي شرح وبهذا الشكل:
 {
   "party": "",
   "items": [
     {
       "item_type": "النوع كما كُتب (اسم الصنف)",
-      "item_code": "الموديل كما كُتب (حروف وأرقام)",
-      "qty_text": "العدد كما كُتب حرفياً مثل 1×61 أو 61",
+      "pack_text": "عمود الحبة/العدد في الباكت حرفياً مثل 12×6",
+      "item_code": "الموديل كما كُتب مثل W-2130 أو C-64 أو A-299",
+      "qty_text": "عمود العدد حرفياً مع الوحدة مثل 56×1 (كرتون/باكت)",
       "unclear": true إذا لم تكن متأكداً من قراءة الصف
     }
   ]
 }
-قواعد: حوّل الأرقام العربية والهندية إلى لاتينية. لا تحوّل ولا تحسب الكميات، انقل qty_text كما هو.
-الموديل رمز دقيق: انسخه حرفاً حرفاً ولا تصحح. لا تخمّن اسماً غير واضح: اكتب ما تراه وضع unclear = true.
+قواعد: حوّل الأرقام العربية والهندية إلى لاتينية. لا تحوّل ولا تحسب الكميات، انقل النصوص كما هي.
+الموديل رمز دقيق (حرف ثم شرطة ثم أرقام غالباً): انسخه حرفاً حرفاً ولا تصحح. لا تخمّن اسماً أو رقماً غير واضح: اكتب ما تراه وضع unclear = true.
 ''';
 
-/// عدد مكتوب بصيغة كراتين×دزن.
-class CartonQty {
-  final double cartons;
-  final double dozens;
-  final bool plain; // رقم واحد بدون ×: يُفسَّر دزناً
-  const CartonQty(this.cartons, this.dozens, {this.plain = false});
-
-  /// القطع = كراتين × دزن × 12.
-  double get pieces => cartons * dozens * 12;
+/// عدد مكتوب بصيغة «56 × 1 (كرتون/باكت)»: العدد حاصل ضرب الأرقام، والوحدة من القوس.
+class ListQty {
+  final double count;
+  final String unit;
+  const ListQty(this.count, this.unit);
 }
 
-/// يقرأ «1×61» أو «1x61» أو «١ * ٦١» أو «61». null إن لم يوجد رقم.
-CartonQty? parseCartonDozen(String raw) {
+List<double> _nums(String raw) {
   final t = normalizeDigits(raw).replaceAll(RegExp(r'[,،]'), '.');
-  final m = RegExp(r'(\d+(?:\.\d+)?)\s*[x×X*✕✖]\s*(\d+(?:\.\d+)?)').firstMatch(t);
-  if (m != null) {
-    return CartonQty(double.parse(m.group(1)!), double.parse(m.group(2)!));
-  }
-  final one = RegExp(r'\d+(?:\.\d+)?').firstMatch(t);
-  if (one == null) return null;
-  return CartonQty(1, double.parse(one.group(0)!), plain: true);
+  return [for (final m in RegExp(r'\d+(?:\.\d+)?').allMatches(t)) double.parse(m.group(0)!)];
+}
+
+/// «56 × 1 (كرتون/باكت)» ← 56 كرتون. «294 ×» ← 294. null إن لم يوجد رقم.
+ListQty? parseListQty(String raw) {
+  final inParen = RegExp(r'[\(（]([^\)）]*)[\)）]').firstMatch(raw);
+  final body = inParen == null ? raw : raw.replaceFirst(inParen.group(0)!, ' ');
+  final n = _nums(body);
+  if (n.isEmpty) return null;
+  final unit = (inParen?.group(1) ?? '').split(RegExp(r'[/،,]')).first.trim();
+  return ListQty(n.fold<double>(1, (a, b) => a * b), unit);
+}
+
+/// «12 × 6» ← 72 قطعة في الوحدة (الحبة × العدد في الباكت). 0 إن لم يُقرأ.
+double parsePackPieces(String raw) {
+  final n = _nums(raw);
+  return n.isEmpty ? 0 : n.fold<double>(1, (a, b) => a * b);
 }
 
 int _lev(String a, String b) {
@@ -78,32 +84,35 @@ String _code(String s) => normalizeDigits(s).toUpperCase().replaceAll(RegExp(r'[
   return nearCount == 1 ? (near!, true) : null;
 }
 
-/// يحوّل رد النموذج إلى أصناف: الكمية بالقطع (كراتين×دزن×12)، والاسم والسعر من الصنف المعروف إن وُجد
-/// الموديل، وإلا يبقى الاسم المقروء ويُعلَّم الصف للمراجعة.
+/// يحوّل رد النموذج إلى أصناف: الكمية كما كُتبت (بوحدتها)، وحجم الوحدة بالقطع، والاسم من الصنف المعروف
+/// إن طابق الموديل، وإلا يبقى الاسم المقروء ويُعلَّم الصف للمراجعة. لا أسعار: قوائم المخزون بلا أسعار.
 List<InvoiceItem> buildHandwrittenItems(List<Map<String, dynamic>> raw, Map<String, InvoiceItem> catalog) {
   final out = <InvoiceItem>[];
   for (final e in raw) {
     final code = normalizeDigits((e['item_code'] ?? '').toString()).trim();
     final type = (e['item_type'] ?? '').toString().trim();
     final qtyText = normalizeDigits((e['qty_text'] ?? '').toString()).trim();
+    final packText = normalizeDigits((e['pack_text'] ?? '').toString()).trim();
     if (code.isEmpty && type.isEmpty && qtyText.isEmpty) continue;
-    final q = parseCartonDozen(qtyText);
+    final q = parseListQty(qtyText);
+    final pack = parsePackPieces(packText);
     final hit = matchModelCode(code, catalog.values);
     var flagged = e['unclear'] == true || q == null || code.isEmpty;
     final notes = <String>[];
     if (q != null) {
-      notes.add(q.plain ? '$qtyText دزن = ${formatQty(q.pieces)} قطعة' : '$qtyText = ${formatQty(q.pieces)} قطعة');
+      final unit = q.unit.isEmpty ? 'وحدة' : q.unit;
+      notes.add(pack > 0
+          ? '${formatQty(q.count)} $unit × ${formatQty(pack)} = ${formatQty(q.count * pack)} قطعة'
+          : qtyText);
     } else if (qtyText.isNotEmpty) {
       notes.add('العدد المكتوب: $qtyText');
     }
     var name = type;
-    var price = 0.0;
     var itemCode = code;
     if (hit != null) {
       final known = hit.$1;
       itemCode = known.itemCode;
       if (known.description.trim().isNotEmpty) name = known.description;
-      price = known.unitPrice;
       if (hit.$2) {
         flagged = true;
         notes.add('الموديل المقروء «$code» قريب من «${known.itemCode}»، تأكد منه');
@@ -115,9 +124,9 @@ List<InvoiceItem> buildHandwrittenItems(List<Map<String, dynamic>> raw, Map<Stri
     out.add(InvoiceItem(
       itemCode: itemCode,
       description: name,
-      quantity: q?.pieces ?? 0,
-      unitPrice: price,
-      unit: 'قطعة',
+      quantity: q?.count ?? 0,
+      unit: q == null || q.unit.isEmpty ? '' : q.unit,
+      packSize: pack,
       notes: notes.join(' • '),
     )..flagged = flagged);
   }

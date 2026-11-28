@@ -1,55 +1,57 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:daftar/models/invoice_item.dart';
 import 'package:daftar/utils/handwritten_list.dart';
+import 'package:daftar/utils/number_utils.dart';
 
 void main() {
-  test('1x61 means 1 carton of 61 dozen, pieces x12', () {
-    final q = parseCartonDozen('1×61')!;
-    expect(q.cartons, 1);
-    expect(q.dozens, 61);
-    expect(q.pieces, 732);
-    expect(parseCartonDozen('٢ x ١٥')!.pieces, 2 * 15 * 12);
-    expect(parseCartonDozen('1*61')!.pieces, 732);
+  test('count column: number x 1 with unit in parentheses', () {
+    final q = parseListQty('56 × 1 (كرتون/باكت)')!;
+    expect(q.count, 56);
+    expect(q.unit, 'كرتون');
+    expect(parseListQty('٥٢ x ١ (ك/كيس)')!.count, 52);
+    expect(parseListQty('294 ×')!.count, 294);
+    expect(parseListQty('بدون'), isNull);
   });
-  test('plain number is dozens and marked plain', () {
-    final q = parseCartonDozen('61')!;
-    expect(q.plain, isTrue);
-    expect(q.pieces, 61 * 12);
-    expect(parseCartonDozen('بدون رقم'), isNull);
+  test('pack column gives pieces per unit', () {
+    expect(parsePackPieces('12 × 6'), 72);
+    expect(parsePackPieces('48 × 1'), 48);
+    expect(parsePackPieces('؟'), 0);
   });
   final cat = {
-    'A120': InvoiceItem(itemCode: 'A120', description: 'شنطة ظهر', unitPrice: 15),
-    'B300': InvoiceItem(itemCode: 'B300', description: 'حقيبة سفر', unitPrice: 40),
+    'W-2130': InvoiceItem(itemCode: 'W-2130', description: 'بناجر بناتي أوميغا'),
+    'C-64': InvoiceItem(itemCode: 'C-64', description: 'بناجر أبوجر كبير'),
   };
-  test('known model fills name and last price', () {
+  test('known model fills the name; qty and pack kept', () {
     final r = buildHandwrittenItems([
-      {'item_type': 'شنطه', 'item_code': 'A120', 'qty_text': '1×61'}
+      {'item_type': 'بناجر بناتي', 'pack_text': '12 × 6', 'item_code': 'W-2130', 'qty_text': '56 × 1 (كرتون/باكت)'}
     ], cat);
-    expect(r.single.description, 'شنطة ظهر');
-    expect(r.single.unitPrice, 15);
-    expect(r.single.quantity, 732);
+    expect(r.single.description, 'بناجر بناتي أوميغا');
+    expect(r.single.quantity, 56);
+    expect(r.single.unit, 'كرتون');
+    expect(r.single.packSize, 72);
+    expect(r.single.unitPrice, 0);
     expect(r.single.flagged, isFalse);
+    expect(normalizeDigits(r.single.notes).replaceAll(RegExp('[,،٬]'), ''), contains('4032'));
+  });
+  test('model with hyphen differences still matches exactly', () {
+    expect(matchModelCode('W2130', cat.values)!.$2, isFalse);
   });
   test('one-letter model misread is matched but flagged', () {
     final r = buildHandwrittenItems([
-      {'item_type': 'x', 'item_code': 'A12O', 'qty_text': '2×3'}
+      {'item_type': 'x', 'item_code': 'C-46', 'qty_text': '50 × 1 (ك/كيس)', 'pack_text': '24×1'}
     ], cat);
-    expect(r.single.itemCode, 'A120');
+    expect(r.single.itemCode, 'C-46');
     expect(r.single.flagged, isTrue);
-    expect(r.single.notes, contains('قريب'));
   });
   test('unknown model keeps read name and is flagged', () {
     final r = buildHandwrittenItems([
-      {'item_type': 'اسم', 'item_code': 'Z999', 'qty_text': '1×5'}
+      {'item_type': 'اسم', 'item_code': 'Z-999', 'qty_text': '5 × 1', 'pack_text': ''}
     ], cat);
     expect(r.single.description, 'اسم');
     expect(r.single.flagged, isTrue);
   });
   test('ambiguous near matches are not guessed', () {
-    final c2 = {
-      'A121': InvoiceItem(itemCode: 'A121'),
-      'A122': InvoiceItem(itemCode: 'A122'),
-    };
+    final c2 = {'A121': InvoiceItem(itemCode: 'A121'), 'A122': InvoiceItem(itemCode: 'A122')};
     expect(matchModelCode('A120', c2.values), isNull);
   });
 }
