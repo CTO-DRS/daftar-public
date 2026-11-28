@@ -13,6 +13,8 @@ String? waPhone(String raw, {String defaultCountry = '966'}) {
   } else if (d.length <= 9) {
     d = defaultCountry + d;
   }
+  // «+966 05xxxxxxxx»: صفر زائد بعد رمز الدولة.
+  if (d.startsWith('${defaultCountry}0')) d = defaultCountry + d.substring(defaultCountry.length + 1);
   return d.length >= 8 && d.length <= 15 ? d : null;
 }
 
@@ -29,12 +31,12 @@ String reminderText({
   final late = dueDate != null && now.isAfter(dueDate)
       ? now.difference(dueDate).inDays
       : 0;
-  final b = StringBuffer('السلام عليكم ${party.trim()}،\n');
+  final b = StringBuffer(party.trim().isEmpty ? 'السلام عليكم،\n' : 'السلام عليكم ${party.trim()}،\n');
   b.write('نذكّركم بخصوص الفاتورة رقم $number');
   if (dueDate != null) {
     final d = '${dueDate.year}/${dueDate.month.toString().padLeft(2, '0')}/${dueDate.day.toString().padLeft(2, '0')}';
     b.write(late > 0
-        ? ' التي استحق سدادها بتاريخ $d (متأخرة $late يوماً)'
+        ? ' التي استحق سدادها بتاريخ $d (متأخرة ${late == 1 ? 'يوماً واحداً' : late == 2 ? 'يومين' : late <= 10 ? '$late أيام' : '$late يوماً'})'
         : ' المستحقة بتاريخ $d');
   }
   b.write('، والمتبقي منها ${formatMoney(remaining)} $currency.\n');

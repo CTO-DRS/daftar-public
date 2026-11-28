@@ -18,7 +18,7 @@ void main() {
         currency: 'ر.س',
         dueDate: DateTime(2026, 11, 1),
         now: DateTime(2026, 11, 11));
-    expect(t, contains('متأخرة 10 يوماً'));
+    expect(t, contains('متأخرة 10 أيام'));
     expect(t, contains('500.00'));
     expect(waUri('966551234567', t).toString(),
         startsWith('https://wa.me/966551234567?text='));
