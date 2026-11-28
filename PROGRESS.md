@@ -8,3 +8,4 @@
 - Settings save keeps a custom VAT rate (was forced to 15) and strips non-digits from the seller VAT number.
 - v0.1.69+70 tagged: auto-sync failure notice, duplicate-finder digit fix, settings VAT fix.
 - v0.1.69 CI green, APK verified (signer ffeba34a..., versionCode 2070).
+- Roadmap (1) stock-ledger reviewed: no defects found; unit conversion (dozen/carton sales) is by wholesale_qty*pack as designed.
