@@ -36,4 +36,29 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byType(ChoiceChip), findsNothing);
   });
+  testWidgets('pages appended to the same list while rasterising do not crash the view', (t) async {
+    // مكتبة printing تضيف الصفحات تباعاً إلى القائمة نفسها: كان ذلك يُسقط العرض (شاشة رمادية).
+    final pages = <PdfPreviewPageData>[
+      PdfPreviewPageData(image: MemoryImage(_png), width: 595, height: 842)
+    ];
+    late StateSetter set;
+    await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: StatefulBuilder(builder: (c, s) {
+      set = s;
+      return SizedBox(height: 500, child: PdfPagesView(pages: pages));
+    }))));
+    await t.pumpAndSettle();
+    pages.add(PdfPreviewPageData(image: MemoryImage(_png), width: 595, height: 842));
+    set(() {});
+    await t.pumpAndSettle();
+    pages.add(PdfPreviewPageData(image: MemoryImage(_png), width: 595, height: 842));
+    set(() {});
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(find.byKey(const ValueKey('pdf-page-2')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('pdf-page-2')));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+  });
 }

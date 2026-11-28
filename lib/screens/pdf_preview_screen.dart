@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart' show PdfPageFormat;
 import 'package:printing/printing.dart';
 import '../widgets/pdf_pages_view.dart';
 
@@ -24,6 +25,8 @@ class PdfPreviewScreen extends StatefulWidget {
 
 class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
   late final Future<Uint8List> _bytes = _build();
+
+  Future<Uint8List> _bytesFor(PdfPageFormat _) => _bytes;
 
   Future<Uint8List> _build() async {
     final party = await AppDatabase.instance.partyByName(widget.invoice.party);
@@ -80,7 +83,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
           return ContentWidth(maxWidth: 1000, child: Column(children: [
             Expanded(
               child: PdfPreview.builder(
-                build: (_) async => bytes,
+                build: _bytesFor, // مرجع ثابت: إغلاق جديد كل مرة يعيد تحويل الصفحات
                 pagesBuilder: (context, pages) => PdfPagesView(pages: pages),
                 pdfFileName: _fileName,
                 canChangeOrientation: false,

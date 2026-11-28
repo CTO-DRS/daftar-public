@@ -23,12 +23,17 @@ class _PdfPagesViewState extends State<PdfPagesView> {
     _keys = List.generate(widget.pages.length, (_) => GlobalKey());
   }
 
-  @override
-  void didUpdateWidget(PdfPagesView old) {
-    super.didUpdateWidget(old);
-    if (old.pages.length != widget.pages.length) {
-      _keys = List.generate(widget.pages.length, (_) => GlobalKey());
-      _current = _current.clamp(0, widget.pages.length - 1);
+  /// مكتبة printing تُضيف الصفحات إلى نفس القائمة تباعاً أثناء التحويل (قائمة واحدة تتغير
+  /// محتوياتها)، لذلك لا يمكن الاعتماد على didUpdateWidget لمعرفة تغيّر العدد: نُزامن المفاتيح هنا.
+  void _syncKeys(int n) {
+    while (_keys.length < n) {
+      _keys.add(GlobalKey());
+    }
+    if (_keys.length > n) _keys = _keys.sublist(0, n);
+    if (n == 0) {
+      _current = 0;
+    } else if (_current > n - 1) {
+      _current = n - 1;
     }
   }
 
@@ -39,6 +44,7 @@ class _PdfPagesViewState extends State<PdfPagesView> {
   }
 
   void _jump(int i) {
+    if (i >= _keys.length) return;
     final ctx = _keys[i].currentContext;
     if (ctx == null) return;
     setState(() => _current = i);
@@ -64,6 +70,7 @@ class _PdfPagesViewState extends State<PdfPagesView> {
   @override
   Widget build(BuildContext context) {
     final n = widget.pages.length;
+    _syncKeys(n);
     return Column(children: [
       if (n > 1)
         SizedBox(
