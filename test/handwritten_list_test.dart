@@ -54,4 +54,8 @@ void main() {
     final c2 = {'A121': InvoiceItem(itemCode: 'A121'), 'A122': InvoiceItem(itemCode: 'A122')};
     expect(matchModelCode('A120', c2.values), isNull);
   });
+  test('prompt embeds the owner example rows', () {
+    expect(kHandwrittenPrompt, contains('W-2130'));
+    expect(kHandwrittenPrompt, contains('294 ×'));
+  });
 }
