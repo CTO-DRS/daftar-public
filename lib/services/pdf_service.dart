@@ -86,6 +86,7 @@ class PdfService {
     final logoImage = logo == null ? null : pw.MemoryImage(logo);
     final owes = st.balance > 0.005;
     doc.addPage(pw.MultiPage(
+      maxPages: 500,
       pageTheme: pw.PageTheme(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(28, 26, 28, 28),
@@ -537,6 +538,7 @@ class PdfService {
 
     doc.addPage(
       pw.MultiPage(
+      maxPages: 500,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.fromLTRB(28, 26, 28, compact ? 24 : 28),

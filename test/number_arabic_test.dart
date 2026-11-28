@@ -17,7 +17,7 @@ void main() {
     final db = AppDatabase.instance;
     await (await db.db).delete('invoices');
     final prefix = SettingsService.instance.inventoryPrefix; // JRD-
-    await db.saveInvoice(Invoice(kind: DocKind.inventory, number: '${prefix}٠٠٠٧', items: [InvoiceItem(description: 'x', quantity: 1, unitPrice: 1)]));
+    await db.saveInvoice(Invoice(kind: DocKind.inventory, number: '$prefix٠٠٠٧', items: [InvoiceItem(description: 'x', quantity: 1, unitPrice: 1)]));
     final n = await db.nextNumber(DocKind.inventory);
     expect(n.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^0+'), ''), '8');
   });
