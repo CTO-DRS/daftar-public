@@ -6,10 +6,16 @@ import 'package:daftar/utils/number_utils.dart';
 void main() {
   test('count column: number x 1 with unit in parentheses', () {
     final q = parseListQty('56 × 1 (كرتون/باكت)')!;
-    expect(q.count, 56);
+    expect(q.dozens, 56);
+    expect(q.count, 1);
+    expect(q.pieces, 672);
     expect(q.unit, 'كرتون');
-    expect(parseListQty('٥٢ x ١ (ك/كيس)')!.count, 52);
-    expect(parseListQty('294 ×')!.count, 294);
+    expect(parseListQty('٥٢ x ١ (ك/كيس)')!.dozens, 52);
+    expect(parseListQty('٥٢ x ١ (ك/كيس)')!.unit, 'كرتون');
+    expect(parseListQty('294 ×')!.dozens, 294);
+    expect(parseListQty('294 ×')!.count, 1);
+    final r = parseListQty('١ × ٥٦ (باكتة)')!;
+    expect([r.dozens, r.count], [56, 1]);
     expect(parseListQty('بدون'), isNull);
   });
   test('pack column gives pieces per unit', () {
@@ -26,12 +32,14 @@ void main() {
       {'item_type': 'بناجر بناتي', 'pack_text': '12 × 6', 'item_code': 'W-2130', 'qty_text': '56 × 1 (كرتون/باكت)'}
     ], cat);
     expect(r.single.description, 'بناجر بناتي أوميغا');
-    expect(r.single.quantity, 56);
+    expect(r.single.quantity, 0);
+    expect(r.single.wholesaleQty, 1);
     expect(r.single.unit, 'كرتون');
-    expect(r.single.packSize, 72);
+    expect(r.single.packSize, 672);
+    expect(r.single.pieces, 672);
     expect(r.single.unitPrice, 0);
     expect(r.single.flagged, isFalse);
-    expect(normalizeDigits(r.single.notes).replaceAll(RegExp('[,،٬]'), ''), contains('4032'));
+    expect(normalizeDigits(r.single.notes).replaceAll(RegExp('[,،٬]'), ''), contains('672'));
   });
   test('model with hyphen differences still matches exactly', () {
     expect(matchModelCode('W2130', cat.values)!.$2, isFalse);

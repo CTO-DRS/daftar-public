@@ -129,7 +129,10 @@ QuickInvoice parseQuickInvoice(String text,
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty);
   final items = <InvoiceItem>[];
+  // عناوين منسوخة مع القائمة («تفصيل الفاتورة»، «النوع | الموديل | العدد») ليست أصنافاً.
+  final header = RegExp(r'^(?:ال)?(?:تفصيل|تفاصيل|بيان|بنود|قائمة|أصناف|اصناف)(?:\s+[\u0600-\u06FF]+)?$|^(?:ال)?(?:نوع|موديل|عدد|باكت)(?:\s*[|/]\s*(?:ال)?(?:نوع|موديل|عدد|باكت|حبة))+$');
   for (final c in chunks) {
+    if (!RegExp(r'\d').hasMatch(normalizeDigits(c)) && header.hasMatch(c.trim().replaceAll(RegExp(r'[:：.]+$'), ''))) continue;
     final it = _parseLine(c, catalog);
     if (it != null) items.add(it);
   }
@@ -151,13 +154,13 @@ InvoiceItem? _parseStructuredLine(String chunk, List<InvoiceItem> catalog) {
   final modelSeg = segs.indexWhere((e) => RegExp(r'^(?:ال)?موديل(?=\s|$)').hasMatch(e));
   final qtySeg = segs.indexWhere((e) => RegExp(r'^عدد(?=\s|$)').hasMatch(e));
   if (modelSeg < 0 && qtySeg < 0) return null;
-  final name = segs.first;
+  final name = segs.first.replaceFirst(RegExp(r'^\d+\s*[.)\-:]\s+'), '').trim();
   if (RegExp(r'^(?:ال)?موديل(?=\s|$)|^عدد(?=\s|$)').hasMatch(name)) return null;
   var code = '';
   if (modelSeg >= 0) {
     code = segs[modelSeg].replaceFirst(RegExp(r'^(?:ال)?موديل\s*'), '').trim();
   }
-  var qty = 1.0, qtyFound = false;
+  var qty = 1.0, dozens = 0.0, qtyFound = false, singleNum = false;
   var unit = '';
   final notes = <String>[];
   if (qtySeg >= 0) {
@@ -167,12 +170,26 @@ InvoiceItem? _parseStructuredLine(String chunk, List<InvoiceItem> catalog) {
     final plain = paren == null ? body : body.replaceFirst(paren.group(0)!, ' ');
     final nums = RegExp(r'\d+(?:\.\d+)?').allMatches(normalizeDigits(plain)).toList();
     if (nums.isNotEmpty) {
-      qty = nums.fold<double>(1, (a, m) => a * double.parse(m.group(0)!));
+      // الكرتون هو الرقم الصغير والدرزنات الرقم الكبير، بغض النظر عن ترتيب الكتابة («56 × 1» أو «1 × 56»).
+      final v = [for (final m in nums) double.parse(m.group(0)!)];
+      if (v.length >= 2) {
+        final hi = v.reduce((a, b) => a > b ? a : b), lo = v.reduce((a, b) => a < b ? a : b);
+        dozens = hi;
+        qty = lo;
+      } else {
+        dozens = v.first;
+        qty = v.first;
+        singleNum = true;
+      }
       qtyFound = true;
       final at = plain.indexOf(RegExp(r'[^\d\s×xX*.]'), nums.last.end);
       final after = at < 0 ? '' : plain.substring(at).trim();
       final firstWord = after.split(RegExp(r'[\s/،,]+')).firstWhere((e) => e.isNotEmpty, orElse: () => '');
       unit = _unit(firstWord) ?? '';
+      if (unit.isEmpty && paren != null) {
+        final pw = paren.group(1)!.split(RegExp(r'[\s/،,]+')).firstWhere((e) => e.isNotEmpty, orElse: () => '');
+        unit = _unit(pw) ?? (pw == 'ك' ? 'كرتون' : '');
+      }
     }
   }
   var pack = 0.0;
@@ -214,7 +231,17 @@ InvoiceItem? _parseStructuredLine(String chunk, List<InvoiceItem> catalog) {
     item.costPrice = hit.costPrice;
   }
   item.notes = notes.join(' • ');
-  if ((item.unit == 'كرتون' || item.unit == 'درزن') && item.packSize > 0 && qtyFound) {
+  // «56 × 1 (كرتون)»: 56 دزينة في الكرتون × 1 كرتون.
+  if (dozens > 0 && item.unit == 'كرتون' && qtyFound) {
+    if (pack > 0) notes.add('الباكت ${formatQty(pack)}');
+    item.unit = 'كرتون';
+    item.packSize = dozens * 12;
+    item.notes = notes.join(' • ');
+    item.wholesaleQty = singleNum ? 1 : qty;
+    item.wholesaleUnit = 'كرتون';
+    item.wholesalePrice = item.unitPrice * item.packSize;
+    item.quantity = 0;
+  } else if ((item.unit == 'كرتون' || item.unit == 'درزن') && item.packSize > 0 && qtyFound) {
     item.wholesaleQty = qty;
     item.wholesaleUnit = item.unit;
     item.wholesalePrice = item.unitPrice * item.packSize;

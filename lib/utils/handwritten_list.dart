@@ -40,14 +40,17 @@ const kHandwrittenPrompt = '''
 | بناجر عادي | 12 × 12 | X-228 | 29 × 1 |
 | بناجر عادي | 12 × 12 | T-1078 | 52 × 1 |
 | خواتم ذهبي | 24 × 1 | A-299 | 294 × |
-الوحدة بين قوسين مثل (كرتون/باكت) أو (ك/كيس) تكتب ضمن qty_text كما هي، وقد تغيب (مثل 50 × 1). الصف الذي ينقصه رقم يبقى كما كُتب (مثل 294 ×) مع unclear = true.
+في الورقة الأصلية تُكتب وحدة العبوة بخط صغير فوق خانة العدد (باكتة، كيس، علبة، درزنة)، وتختلف من صف لآخر: اقرأها لكل صف على حدة وضعها بين قوسين في qty_text. رقما العدد هما عدد الكراتين (الصغير) × عدد الدزينات (الكبير)، وقد يُكتبان بأي ترتيب، فانقلهما كما تراهما.\nالوحدة بين قوسين مثل (كرتون/باكت) أو (ك/كيس) تكتب ضمن qty_text كما هي، وقد تغيب (مثل 50 × 1). الصف الذي ينقصه رقم يبقى كما كُتب (مثل 294 ×) مع unclear = true.
 ''';
 
 /// عدد مكتوب بصيغة «56 × 1 (كرتون/باكت)»: العدد حاصل ضرب الأرقام، والوحدة من القوس.
 class ListQty {
-  final double count;
+  final double dozens; // الرقم الأول: عدد الدزينات في الكرتون
+  final double count; // الرقم الثاني: عدد الكراتين (1 إن لم يُكتب)
   final String unit;
-  const ListQty(this.count, this.unit);
+  const ListQty(this.dozens, this.count, this.unit);
+  double get piecesPerCarton => dozens * 12;
+  double get pieces => piecesPerCarton * count;
 }
 
 List<double> _nums(String raw) {
@@ -55,14 +58,18 @@ List<double> _nums(String raw) {
   return [for (final m in RegExp(r'\d+(?:\.\d+)?').allMatches(t)) double.parse(m.group(0)!)];
 }
 
-/// «56 × 1 (كرتون/باكت)» ← 56 كرتون. «294 ×» ← 294. null إن لم يوجد رقم.
+/// «56 × 1» أو «1 × 56» ← 56 دزينة × 1 كرتون (672 قطعة). «294 ×» ← 294 دزينة × 1 كرتون. null إن لم يوجد رقم.
 ListQty? parseListQty(String raw) {
   final inParen = RegExp(r'[\(（]([^\)）]*)[\)）]').firstMatch(raw);
   final body = inParen == null ? raw : raw.replaceFirst(inParen.group(0)!, ' ');
   final n = _nums(body);
   if (n.isEmpty) return null;
-  final unit = (inParen?.group(1) ?? '').split(RegExp(r'[/،,]')).first.trim();
-  return ListQty(n.fold<double>(1, (a, b) => a * b), unit);
+  var unit = (inParen?.group(1) ?? '').split(RegExp(r'[/،,]')).first.trim();
+  if (unit == 'ك') unit = 'كرتون';
+  // الرقم الصغير = الكراتين، الكبير = الدرزنات، مهما كان ترتيب الكتابة («56 × 1» أو «1 × 56»).
+  if (n.length < 2) return ListQty(n.first, 1, unit);
+  final hi = n.reduce((a, b) => a > b ? a : b), lo = n.reduce((a, b) => a < b ? a : b);
+  return ListQty(hi, lo, unit);
 }
 
 /// «12 × 6» ← 72 قطعة في الوحدة (الحبة × العدد في الباكت). 0 إن لم يُقرأ.
@@ -120,10 +127,8 @@ List<InvoiceItem> buildHandwrittenItems(List<Map<String, dynamic>> raw, Map<Stri
     var flagged = e['unclear'] == true || q == null || code.isEmpty;
     final notes = <String>[];
     if (q != null) {
-      final unit = q.unit.isEmpty ? 'وحدة' : q.unit;
-      notes.add(pack > 0
-          ? '${formatQty(q.count)} $unit × ${formatQty(pack)} = ${formatQty(q.count * pack)} قطعة'
-          : qtyText);
+      notes.add('${formatQty(q.dozens)} دزينة × ${formatQty(q.count)} كرتون = ${formatQty(q.pieces)} قطعة');
+      if (pack > 0) notes.add('الباكت ${packText.isEmpty ? formatQty(pack) : packText}');
     } else if (qtyText.isNotEmpty) {
       notes.add('العدد المكتوب: $qtyText');
     }
@@ -144,9 +149,11 @@ List<InvoiceItem> buildHandwrittenItems(List<Map<String, dynamic>> raw, Map<Stri
     out.add(InvoiceItem(
       itemCode: itemCode,
       description: name,
-      quantity: q?.count ?? 0,
-      unit: q == null || q.unit.isEmpty ? '' : q.unit,
-      packSize: pack,
+      quantity: 0,
+      unit: q == null ? '' : 'كرتون',
+      wholesaleQty: q?.count ?? 0,
+      wholesaleUnit: q == null ? '' : 'كرتون',
+      packSize: q?.piecesPerCarton ?? pack,
       notes: notes.join(' • '),
     )..flagged = flagged);
   }
