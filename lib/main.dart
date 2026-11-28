@@ -4,6 +4,7 @@ import 'widgets/app_lock.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'screens/invoices_list_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/settings_service.dart';
 import 'utils/number_utils.dart';
 
@@ -103,7 +104,7 @@ class DaftarApp extends StatelessWidget {
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: mode,
-        home: const AppLock(child: InvoicesListScreen()),
+        home: const AppLock(child: FirstRunGate(child: InvoicesListScreen())),
       ),
     );
   }

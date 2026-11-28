@@ -55,6 +55,10 @@ class SettingsService {
   String get pdfTemplate => _p.getString('pdf_template') ?? 'classic';
   set pdfTemplate(String v) => _p.setString('pdf_template', v);
 
+  /// ظهرت الجولة التعريفية (أو لا حاجة لها).
+  bool get onboarded => _p.getBool('onboarded') ?? false;
+  set onboarded(bool v) => _p.setBool('onboarded', v);
+
   // ---- المزامنة السحابية (اختيارية) ----
   String get syncEmail => _p.getString('sync_email') ?? '';
   set syncEmail(String v) => _p.setString('sync_email', v);

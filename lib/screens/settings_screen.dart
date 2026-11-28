@@ -24,6 +24,7 @@ import '../widgets/app_lock.dart';
 import '../widgets/sync_card.dart';
 import '../services/auto_backup.dart';
 import 'audit_screen.dart';
+import 'onboarding_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -362,6 +363,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: const Icon(Icons.chevron_left),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const AboutScreen())),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.tour_outlined),
+            title: const Text('جولة تعريفية'),
+            subtitle: const Text('مراجعة سريعة لأهم ما يقدمه دفتر'),
+            trailing: const Icon(Icons.chevron_left),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OnboardingScreen())),
           ),
         ),
         const SizedBox(height: 20),
