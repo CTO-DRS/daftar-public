@@ -7,3 +7,4 @@
 - After v0.1.68: duplicate finder no longer flags names differing by a digit (كولا 330 vs 335).
 - Settings save keeps a custom VAT rate (was forced to 15) and strips non-digits from the seller VAT number.
 - v0.1.69+70 tagged: auto-sync failure notice, duplicate-finder digit fix, settings VAT fix.
+- v0.1.69 CI green, APK verified (signer ffeba34a..., versionCode 2070).
