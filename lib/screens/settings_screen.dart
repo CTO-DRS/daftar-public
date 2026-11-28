@@ -481,6 +481,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           decoration: InputDecoration(
             labelText: 'مفتاح API',
             suffixIcon: IconButton(
+              tooltip: _hide ? 'إظهار المفتاح' : 'إخفاء المفتاح',
               icon: Icon(_hide ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _hide = !_hide),
             ),

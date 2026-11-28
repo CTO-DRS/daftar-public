@@ -45,12 +45,12 @@ class TotalsBar extends StatelessWidget {
                 ),
               ),
             Row(children: [
-            _Stat(label: 'الأصناف', value: localizeDigits('$itemCount')),
+            Flexible(child: _Stat(label: 'الأصناف', value: localizeDigits('$itemCount'))),
             _divider(),
-            _Stat(label: 'العدد الكلي', value: formatQty(totalQty)),
+            Flexible(flex: 2, child: _Stat(label: 'العدد الكلي', value: formatQty(totalQty))),
             _divider(),
             Expanded(
-              flex: 2,
+              flex: 4,
               child: _Stat(
                   label: 'الإجمالي ($currency)',
                   value: formatMoney(grandTotal),
@@ -66,7 +66,7 @@ class TotalsBar extends StatelessWidget {
   Widget _divider() => Container(
       width: 1,
       height: 32,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
       color: Colors.white24);
 }
 
@@ -83,6 +83,8 @@ class _Stat extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white70, fontSize: 12)),
         FittedBox(
           fit: BoxFit.scaleDown,

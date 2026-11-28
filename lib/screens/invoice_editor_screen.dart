@@ -925,6 +925,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             suffixIcon: _filter.text.isEmpty
                 ? null
                 : IconButton(
+                    tooltip: 'مسح البحث',
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       _filter.clear();

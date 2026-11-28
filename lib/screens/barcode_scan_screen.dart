@@ -35,6 +35,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('امسح الباركود'), actions: [
           IconButton(
+              tooltip: 'الفلاش',
               icon: const Icon(Icons.flash_on),
               onPressed: () => _controller.toggleTorch()),
         ]),

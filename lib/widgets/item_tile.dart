@@ -153,7 +153,11 @@ class _Tag extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: cs.onSurfaceVariant),
         const SizedBox(width: 3),
-        Text(text, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+        Flexible(
+            child: Text(text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12))),
       ],
     );
   }

@@ -566,6 +566,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                 leading: const Icon(Icons.arrow_circle_down_outlined),
                 title: Text('من ${formatQty(t.minQty)} فأكثر: ${formatMoney(t.price)} للوحدة'),
                 trailing: IconButton(
+                  tooltip: 'حذف الشريحة',
                   icon: const Icon(Icons.close),
                   onPressed: () => setState(() {
                     _tiers = _tiers.where((e) => e != t).toList();
@@ -586,7 +587,7 @@ class _ItemEditSheetState extends State<_ItemEditSheet> {
                       controller: _tPrice,
                       keyboardType: numKb,
                       decoration: const InputDecoration(labelText: 'السعر للوحدة'))),
-              IconButton.filledTonal(onPressed: _addTier, icon: const Icon(Icons.add)),
+              IconButton.filledTonal(tooltip: 'إضافة شريحة سعر', onPressed: _addTier, icon: const Icon(Icons.add)),
             ]),
             if (_tierNote != null)
               Padding(
