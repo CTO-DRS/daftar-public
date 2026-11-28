@@ -35,6 +35,7 @@ void main() {
     await t.tap(find.byKey(const ValueKey('merge-سعد الغامدي')));
     await settle(t);
     final names = await t.runAsync(() => AppDatabase.instance.partyDupEntries());
-    expect(names!.map((e) => e.name), ['سعد الغامدي']);
+    // قاعدة الاختبار مشتركة بين الملفات؛ نفحص أسماءنا فقط.
+    expect(names!.map((e) => e.name).where((n) => n.startsWith('سعد')), ['سعد الغامدي']);
   });
 }
