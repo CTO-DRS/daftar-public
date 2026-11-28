@@ -125,7 +125,7 @@ QuickInvoice parseQuickInvoice(String text,
   final chunks = t
       .split(RegExp(r'\s*[،,;]\s*|\s+و(?=\s*(?:\d|' +
           _words.keys.join('|') +
-          r')\b)\s*'))
+          r')(?=\s|$|[,،;]))\s*'))
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty);
   final items = <InvoiceItem>[];
@@ -169,7 +169,8 @@ InvoiceItem? _parseStructuredLine(String chunk, List<InvoiceItem> catalog) {
     if (nums.isNotEmpty) {
       qty = nums.fold<double>(1, (a, m) => a * double.parse(m.group(0)!));
       qtyFound = true;
-      final after = plain.substring(plain.indexOf(RegExp(r'[^\d\s×xX*.]'), nums.last.end).clamp(0, plain.length)).trim();
+      final at = plain.indexOf(RegExp(r'[^\d\s×xX*.]'), nums.last.end);
+      final after = at < 0 ? '' : plain.substring(at).trim();
       final firstWord = after.split(RegExp(r'[\s/،,]+')).firstWhere((e) => e.isNotEmpty, orElse: () => '');
       unit = _unit(firstWord) ?? '';
     }

@@ -40,4 +40,9 @@ void main() {
     expect(q.party, 'أحمد');
     expect(q.items.length, 2);
   });
+  test('"و" before an Arabic number word splits lines (no ASCII word boundary)', () {
+    final q = parseQuickInvoice('فاتورة لأحمد، خمسة كولا و ثلاثة عصير');
+    expect(q.items.length, 2);
+    expect(q.items[1].quantity, 3);
+  });
 }
