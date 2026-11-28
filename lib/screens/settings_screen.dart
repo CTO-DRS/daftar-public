@@ -258,17 +258,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 24),
         const Text('قالب الفاتورة (PDF)', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        SegmentedButton<String>(
-          segments: [
-            for (final t in PdfTemplate.values)
-              ButtonSegment(value: t.name, label: Text(t.label)),
-          ],
-          selected: {SettingsService.instance.pdfTemplate},
-          onSelectionChanged: (v) {
-            SettingsService.instance.pdfTemplate = v.first;
-            setState(() {});
-          },
-        ),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final t in PdfTemplate.values)
+            ChoiceChip(
+              label: Text(t.label),
+              selected: SettingsService.instance.pdfTemplate == t.name,
+              onSelected: (_) {
+                SettingsService.instance.pdfTemplate = t.name;
+                setState(() {});
+              },
+            ),
+        ]),
         const SizedBox(height: 6),
         Text(PdfTemplateX.fromDb(SettingsService.instance.pdfTemplate).hint,
             style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),

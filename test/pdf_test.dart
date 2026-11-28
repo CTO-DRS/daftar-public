@@ -75,7 +75,7 @@ void main() {
     }
     // pdftotext يعيد أشكال العرض (presentation forms) لا الحروف الأصلية.
     bool has1(String p) => p.contains('\uFE8D\uFEDF\uFEA4\uFEAA\uFE8D\uFEA9');
-    for (final t in PdfTemplate.values) {
+    for (final t in PdfTemplate.values.where((t) => !t.isThermal)) {
       final big = Invoice(number: '9', items: List.generate(
           60, (i) => InvoiceItem(description: 'صنف $i', quantity: 2, unitPrice: 3)));
       final pg = await pages(big, t);
@@ -101,7 +101,7 @@ void main() {
     }
     InvoiceItem it(String d, int pg) => InvoiceItem(description: d, quantity: 1, unitPrice: 5, page: pg);
     bool has1(String p) => p.contains('\uFE8D\uFEDF\uFEA4\uFEAA\uFE8D\uFEA9');
-    for (final t in PdfTemplate.values) {
+    for (final t in PdfTemplate.values.where((t) => !t.isThermal)) {
       // ALPHA ص1، BETA ص3، GAMMA ص2: ثلاث ورقات بالترتيب ALPHA, GAMMA, BETA
       final pg = await pages(
           Invoice(number: '7', items: [it('ALPHA', 1), it('BETA', 3), it('GAMMA', 2)]), t);

@@ -12,18 +12,23 @@ import '../utils/statement.dart';
 import '../utils/zatca.dart';
 
 /// قوالب الفاتورة: كلاسيكي، عصري، مختصر.
-enum PdfTemplate { classic, modern, compact }
+enum PdfTemplate { classic, modern, compact, thermal80, thermal58 }
 
 extension PdfTemplateX on PdfTemplate {
   String get label => switch (this) {
         PdfTemplate.classic => 'كلاسيكي',
         PdfTemplate.modern => 'عصري',
         PdfTemplate.compact => 'مختصر',
+        PdfTemplate.thermal80 => 'إيصال 80 مم',
+        PdfTemplate.thermal58 => 'إيصال 58 مم',
       };
+  bool get isThermal => this == PdfTemplate.thermal80 || this == PdfTemplate.thermal58;
   String get hint => switch (this) {
         PdfTemplate.classic => 'خط أميري، ترويسة بسيطة وجدول بإطار',
         PdfTemplate.modern => 'شريط ملوّن، خط حديث وجدول نظيف',
         PdfTemplate.compact => 'أصغر حجماً لتتسع أسطر أكثر في الصفحة',
+        PdfTemplate.thermal80 => 'رول طابعة حرارية بعرض 80 مم، طول الإيصال بقدر الأصناف',
+        PdfTemplate.thermal58 => 'رول طابعة حرارية بعرض 58 مم، أسطر مضغوطة',
       };
   static PdfTemplate fromDb(String? v) => PdfTemplate.values
       .firstWhere((e) => e.name == v, orElse: () => PdfTemplate.classic);
@@ -208,6 +213,11 @@ class PdfService {
     PdfTemplate template = PdfTemplate.classic,
     int? brandColor, // ARGB؛ null = تلقائي من الشعار
   }) async {
+    if (template.isThermal) {
+      return buildThermal(inv,
+          widthMm: template == PdfTemplate.thermal58 ? 58 : 80,
+          currency: currency, company: company, sellerVat: sellerVat, partyPhone: partyPhone);
+    }
     await _loadFonts();
     final slices = pageSlices(inv.items.where((e) => !e.isEmpty).toList());
     final items = [for (final sl in slices) ...sl];
@@ -555,6 +565,101 @@ class PdfService {
         ],
       ),
     );
+    return doc.save();
+  }
+
+  /// إيصال لطابعة حرارية (رول 58 أو 80 مم): صفحة واحدة بطول المحتوى، أبيض وأسود، أسطر مضغوطة.
+  static Future<Uint8List> buildThermal(
+    Invoice inv, {
+    int widthMm = 80,
+    String currency = 'ر.س',
+    String company = '',
+    String sellerVat = '',
+    String partyPhone = '',
+  }) async {
+    await _loadFonts();
+    final narrow = widthMm <= 58;
+    final fs = narrow ? 8.0 : 9.5;
+    final name = company.isEmpty ? 'دفتر' : company;
+    final items = inv.items.where((e) => !e.isEmpty).toList();
+    final vatOn = inv.kind == DocKind.invoice && inv.vatRate > 0;
+    final doc = pw.Document(title: '${inv.docLabel} ${inv.number}', author: name);
+    final w = widthMm * PdfPageFormat.mm;
+    pw.Widget row(String a, String b, {bool bold = false, double? size}) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(a, style: pw.TextStyle(fontSize: size ?? fs, fontWeight: bold ? pw.FontWeight.bold : null)),
+            pw.Text(b, style: pw.TextStyle(fontSize: size ?? fs, fontWeight: bold ? pw.FontWeight.bold : null)),
+          ],
+        );
+    final rule = pw.Divider(thickness: .5, height: 6, borderStyle: pw.BorderStyle.dashed);
+    pw.Widget qr() {
+      if (!vatOn || sellerVat.trim().isEmpty) return pw.SizedBox();
+      final n = DateTime.now();
+      final ts = DateTime(inv.date.year, inv.date.month, inv.date.day, n.hour, n.minute, n.second);
+      final data = zatcaPhase1Qr(
+        sellerName: name,
+        vatNumber: normalizeDigits(sellerVat).trim(),
+        timestamp: ts,
+        totalWithVat: inv.grandTotal,
+        vatAmount: inv.vatAmount,
+      );
+      final side = narrow ? 80.0 : 100.0;
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 6),
+        child: pw.Column(children: [
+          pw.BarcodeWidget(barcode: pw.Barcode.qrCode(), data: data, width: side, height: side),
+          pw.Text('رمز QR (صيغة المرحلة الأولى)', style: pw.TextStyle(fontSize: fs - 2)),
+        ]),
+      );
+    }
+
+    doc.addPage(pw.Page(
+      pageTheme: pw.PageTheme(
+        pageFormat: PdfPageFormat(w, double.infinity, marginAll: (narrow ? 2 : 3) * PdfPageFormat.mm),
+        theme: pw.ThemeData.withFont(base: _plex!, bold: _plexBold!),
+        textDirection: pw.TextDirection.rtl,
+      ),
+      build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+        pw.Center(child: pw.Text(name, style: pw.TextStyle(fontSize: fs + 3, fontWeight: pw.FontWeight.bold))),
+        if (sellerVat.trim().isNotEmpty)
+          pw.Center(child: pw.Text('الرقم الضريبي ${normalizeDigits(sellerVat).trim()}', style: pw.TextStyle(fontSize: fs - 1))),
+        pw.SizedBox(height: 3),
+        pw.Center(child: pw.Text('${inv.docLabel} ${inv.number}', style: pw.TextStyle(fontSize: fs + 1, fontWeight: pw.FontWeight.bold))),
+        pw.Center(child: pw.Text(formatDate(inv.date), style: pw.TextStyle(fontSize: fs - 1))),
+        if (inv.party.trim().isNotEmpty) ...[
+          pw.SizedBox(height: 2),
+          row('العميل', inv.party.trim()),
+          if (partyPhone.trim().isNotEmpty) row('الجوال', partyPhone.trim()),
+        ],
+        rule,
+        for (var i = 0; i < items.length; i++) ...[
+          pw.Text(items[i].description, style: pw.TextStyle(fontSize: fs, fontWeight: pw.FontWeight.bold)),
+          row(
+              items[i].hasWholesale && items[i].quantity == 0
+                  ? '${formatQty(items[i].wholesaleQty)} ${items[i].wholesaleUnit.trim()} × ${formatMoney(items[i].wholesalePrice)}'
+                  : '${formatQty(items[i].quantity)} ${items[i].unit.trim()} × ${formatMoney(items[i].unitPrice)}',
+              formatMoney(items[i].total)),
+          pw.SizedBox(height: 3),
+        ],
+        rule,
+        row('المجموع', formatMoney(inv.subtotal)),
+        if (vatOn) row('الضريبة ${formatQty(inv.vatRate)}%', formatMoney(inv.vatAmount)),
+        row('الإجمالي', '${formatMoney(inv.grandTotal)} $currency', bold: true, size: fs + 2),
+        if (!inv.isNote && inv.remaining > 0.005 && inv.paidAmount > 0) ...[
+          row('المدفوع', formatMoney(inv.paidAmount)),
+          row('المتبقي', formatMoney(inv.remaining), bold: true),
+        ],
+        qr(),
+        if (showsIssuedBy(inv)) ...[
+          pw.SizedBox(height: 6),
+          pw.Center(child: pw.Text(issuedByLines[0], style: pw.TextStyle(fontSize: fs - 2), textAlign: pw.TextAlign.center)),
+          pw.Center(child: pw.Text(issuedByLines[1], style: pw.TextStyle(fontSize: fs - 2, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center)),
+          pw.Center(child: pw.Text(issuedByLines[2], style: pw.TextStyle(fontSize: fs - 2), textAlign: pw.TextAlign.center)),
+          pw.Center(child: pw.Text(issuedByLines[3], style: pw.TextStyle(fontSize: fs - 2.5), textAlign: pw.TextAlign.center)),
+        ],
+      ]),
+    ));
     return doc.save();
   }
 }
