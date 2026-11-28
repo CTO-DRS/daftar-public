@@ -570,7 +570,7 @@ class AppDatabase {
           made++;
           created++;
         }
-        next = nextOccurrence(next, every);
+        next = nextOccurrence(next, every, anchorDay: src.date.day);
       }
       await d.update('recurring', {'next_date': next.millisecondsSinceEpoch},
           where: 'id = ?', whereArgs: [r['id']]);

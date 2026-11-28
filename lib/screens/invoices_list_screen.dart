@@ -228,7 +228,7 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
     if (every == null) return;
     var first = nextOccurrence(inv.date, every);
     while (!first.isAfter(DateTime.now())) {
-      first = nextOccurrence(first, every);
+      first = nextOccurrence(first, every, anchorDay: inv.date.day);
     }
     await AppDatabase.instance.addRecurring(inv.id!, every, first);
     if (!mounted) return;
