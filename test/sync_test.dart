@@ -31,11 +31,16 @@ class FakeServer {
       }
       return http.Response('', 201);
     }
-    final cur = r.url.queryParameters['updated_at']?.replaceFirst('gt.', '');
-    final list = rows.values
-        .where((m) => cur == null || (m['updated_at'] as String).compareTo(cur) > 0)
+    final raw = r.url.queryParameters['updated_at'];
+    final strict = raw != null && raw.startsWith('gt.');
+    final cur = raw?.replaceFirst('gte.', '').replaceFirst('gt.', '');
+    final limit = int.tryParse(r.url.queryParameters['limit'] ?? '') ?? 100000;
+    final list = (rows.values
+        .where((m) => cur == null || (strict ? (m['updated_at'] as String).compareTo(cur) > 0 : (m['updated_at'] as String).compareTo(cur) >= 0))
         .toList()
-      ..sort((a, b) => (a['updated_at'] as String).compareTo(b['updated_at'] as String));
+      ..sort((a, b) => (a['updated_at'] as String).compareTo(b['updated_at'] as String)))
+        .take(limit)
+        .toList();
     return http.Response.bytes(utf8.encode(jsonEncode(list)), 200,
         headers: {'content-type': 'application/json; charset=utf-8'});
   }
@@ -114,5 +119,35 @@ void main() {
     srv.rows[pk]!['updated_at'] = '2026-01-01T00:59:00+00:00';
     await sync.sync();
     expect((await db.partyByName('سالم'))!.phone, '0999');
+  });
+
+  test('pull does not skip rows that share one timestamp across a page boundary, and survives odd rows', () async {
+    final srv = FakeServer();
+    // 450 عميلاً من جهاز آخر: كل 200 في طلب واحد بنفس الوقت، والصفحة 300 تقطع وسط مجموعة.
+    for (var g = 0; g < 3; g++) {
+      final n = g < 2 ? 200 : 50;
+      for (var k = 0; k < n; k++) {
+        final i = g * 200 + k;
+        srv.rows['customer:u$i'] = {
+          'entity': 'customer',
+          'id': 'u$i',
+          'deleted': false,
+          'updated_at': '2026-01-01T00:00:0${g + 1}+00:00',
+          'data': {'u': 5, 'p': {'name': 'عميل $i', 'future_column': 'x'}},
+        };
+      }
+    }
+    srv.rows['customer:bad'] = {'entity': 'customer', 'id': 'bad', 'deleted': false, 'updated_at': '2026-01-01T00:00:09+00:00', 'data': 'not a map'};
+    final sync = SyncService(client: MockClient((r) async => srv.handle(r)), url: 'http://x', anonKey: 'k');
+    final d = await AppDatabase.instance.db;
+    await d.delete('parties');
+    await d.delete('invoices');
+    await d.delete('tombstones');
+    SettingsService.instance.syncRefresh = 'r';
+    SettingsService.instance.syncCursor = '';
+    SettingsService.instance.syncPushTs = 0;
+    await sync.sync();
+    final n = (await d.rawQuery('SELECT COUNT(*) c FROM parties WHERE name LIKE ?', ['عميل %'])).first['c'];
+    expect(n, 450);
   });
 }

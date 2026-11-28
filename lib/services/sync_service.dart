@@ -231,12 +231,15 @@ class SyncService {
     final s = SettingsService.instance;
     var cursor = s.syncCursor;
     var upserts = 0, dels = 0;
+    var limit = 300;
     while (true) {
+      // gte لا gt: الصفوف المرفوعة في طلب واحد تتشارك نفس الوقت، وقد تقطع الصفحة وسطها.
+      // إعادة تطبيق صف حدّي آمنة لأن التطبيق يتجاهل ما ليس أحدث.
       final q = <String, String>{
         'select': 'entity,id,data,deleted,updated_at',
         'order': 'updated_at.asc',
-        'limit': '300',
-        if (cursor.isNotEmpty) 'updated_at': 'gt.$cursor',
+        'limit': '$limit',
+        if (cursor.isNotEmpty) 'updated_at': 'gte.$cursor',
       };
       final r = await _c.get(
           Uri.parse('$_url/rest/v1/records').replace(queryParameters: q),
@@ -245,16 +248,36 @@ class SyncService {
       final rows = (jsonDecode(utf8.decode(r.bodyBytes)) as List).cast<Map<String, dynamic>>();
       if (rows.isEmpty) break;
       for (final row in rows) {
-        final res = await _apply(d, row, applied);
-        if (res == 1) upserts++;
-        if (res == 2) dels++;
+        try {
+          final res = await _apply(d, row, applied);
+          if (res == 1) upserts++;
+          if (res == 2) dels++;
+        } catch (_) {
+          // صف تالف أو من إصدار مختلف لا يوقف بقية المزامنة.
+        }
       }
-      cursor = rows.last['updated_at'] as String;
+      final next = rows.last['updated_at'] as String;
+      if (rows.length < limit) {
+        cursor = next;
+        s.syncCursor = cursor;
+        break;
+      }
+      if (next == cursor) {
+        // صفحة كاملة بنفس الوقت: وسّع النافذة بدل الدوران بلا تقدم.
+        if (limit >= 20000) break;
+        limit *= 4;
+        continue;
+      }
+      cursor = next;
       s.syncCursor = cursor;
-      if (rows.length < 300) break;
+      limit = 300;
     }
     return (upserts, dels);
   }
+
+  /// أعمدة الجدول المحلي: أي عمود غريب قادم من إصدار آخر يُتجاهل.
+  Future<Set<String>> _cols(Database d, String t) async =>
+      {for (final c in await d.rawQuery('PRAGMA table_info($t)')) c['name'] as String};
 
   /// 0 = تجاهل، 1 = كتابة، 2 = حذف.
   Future<int> _apply(Database d, Map<String, dynamic> row, Set<String> applied) async {
@@ -291,9 +314,17 @@ class SyncService {
     }
     if (localU >= u) return 0;
     if (entity == 'invoice') {
-      final inv = Map<String, Object?>.from(data['inv'] as Map)..['uid'] = uid;
+      final invCols = await _cols(d, 'invoices');
+      final itemCols = await _cols(d, 'items');
+      final inv = {
+        for (final e in (data['inv'] as Map).entries)
+          if (invCols.contains(e.key) && e.key != 'id') e.key as String: e.value as Object?
+      }..['uid'] = uid;
       final items = (data['items'] as List? ?? const [])
-          .map((e) => Map<String, Object?>.from(e as Map))
+          .map((e) => {
+                for (final k in (e as Map).entries)
+                  if (itemCols.contains(k.key) && k.key != 'id') k.key as String: k.value as Object?
+              })
           .toList();
       await d.transaction((tx) async {
         int id;
@@ -309,7 +340,11 @@ class SyncService {
         }
       });
     } else {
-      final p = Map<String, Object?>.from(data['p'] as Map)..['uid'] = uid;
+      final pCols = await _cols(d, 'parties');
+      final p = {
+        for (final e in (data['p'] as Map).entries)
+          if (pCols.contains(e.key) && e.key != 'id') e.key as String: e.value as Object?
+      }..['uid'] = uid;
       if (local.isNotEmpty) {
         await d.update('parties', p, where: 'uid = ?', whereArgs: [uid]);
       } else {
