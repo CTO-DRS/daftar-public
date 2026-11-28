@@ -77,8 +77,14 @@ class BackupService {
         await tx.delete(t);
       }
       for (final t in ['parties', 'invoices', 'items', 'recurring', 'price_tiers']) {
+        // أعمدة غير معروفة (نسخة من إصدار مختلف) تُتجاهل بدل أن تُفشل الاستعادة كلها.
+        final cols = {for (final c in await tx.rawQuery('PRAGMA table_info($t)')) c['name'] as String};
         for (final r in (b[t] as List? ?? const [])) {
-          await tx.insert(t, Map<String, Object?>.from(r as Map),
+          final row = {
+            for (final e in (r as Map).entries)
+              if (cols.contains(e.key)) e.key as String: e.value as Object?
+          };
+          await tx.insert(t, row,
               conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }

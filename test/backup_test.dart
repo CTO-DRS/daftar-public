@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:daftar/database/app_database.dart';
@@ -56,5 +57,20 @@ void main() {
     expect(
         () => BackupService.parse('{"format":"daftar-backup","schema":1,"invoices":[],"items":[{"invoice_id":5}],"parties":[],"recurring":[]}'),
         throwsFormatException);
+  });
+  test('restore ignores unknown columns from another app version', () async {
+    final db = AppDatabase.instance;
+    final json = await BackupService.exportJson();
+    final m = jsonDecode(json) as Map<String, dynamic>;
+    for (final r in (m['invoices'] as List)) {
+      (r as Map)['column_from_the_future'] = 'x';
+    }
+    for (final r in (m['parties'] as List)) {
+      (r as Map)['another_future_column'] = 1;
+    }
+    final before = (await db.listInvoices()).length;
+    final sum = await BackupService.restore(jsonEncode(m));
+    expect(sum.invoices, before);
+    expect((await db.listInvoices()).length, before);
   });
 }
