@@ -9,6 +9,11 @@ import 'package:daftar/services/settings_service.dart';
 import 'package:daftar/utils/duplicates.dart';
 
 void main() {
+  test('names differing by a digit are not duplicates', () {
+    final g = findDuplicateGroups([const DupEntry('كولا 330'), const DupEntry('كولا 335')]);
+    expect(g, isEmpty);
+    expect(findDuplicateGroups([const DupEntry('عصير برتقال'), const DupEntry('عصير برتقل')]), hasLength(1));
+  });
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
   setUpAll(() async {

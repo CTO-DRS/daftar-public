@@ -4,3 +4,4 @@
 - On main after v0.1.68: one-time notice when auto-sync fails.
 - Blocked: ZATCA Phase 2 needs user's Fatoora Sandbox/CSID.
 - Reporting rule: single final package when roadmap done (APK + screenshots).
+- After v0.1.68: duplicate finder no longer flags names differing by a digit (كولا 330 vs 335).

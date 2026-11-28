@@ -31,6 +31,9 @@ int _lev(String a, String b) {
   return prev[b.length];
 }
 
+/// الأرقام فقط: «كولا 330» و«كولا 335» صنفان مختلفان وليسا خطأ إملائي.
+String _digits(String s) => normalizeDigits(s).replaceAll(RegExp(r'[^0-9]'), '');
+
 String _tokensKey(String n) => (n.split(' ')..sort()).join(' ');
 
 String _phoneKey(String p) {
@@ -62,7 +65,7 @@ List<DupGroup> findDuplicateGroups(List<DupEntry> all,
         union(i, j, 'نفس الاسم');
       } else if (_tokensKey(norm[i]) == _tokensKey(norm[j])) {
         union(i, j, 'نفس الكلمات بترتيب مختلف');
-      } else if (norm[i].length >= 5 && norm[j].length >= 5 && _lev(norm[i], norm[j]) <= 1) {
+      } else if (norm[i].length >= 5 && norm[j].length >= 5 && _digits(norm[i]) == _digits(norm[j]) && _lev(norm[i], norm[j]) <= 1) {
         union(i, j, 'فرق حرف واحد');
       } else if (byPhone && _phoneKey(all[i].phone).isNotEmpty && _phoneKey(all[i].phone) == _phoneKey(all[j].phone)) {
         union(i, j, 'نفس رقم الجوال');
