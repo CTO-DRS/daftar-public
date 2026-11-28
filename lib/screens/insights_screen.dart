@@ -456,7 +456,7 @@ class _Products extends StatelessWidget {
             const SizedBox(height: 4),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(value: items[i].revenue / max, minHeight: 6, color: cs.primary, backgroundColor: cs.primary.withValues(alpha: .12)),
+              child: LinearProgressIndicator(value: max <= 0 ? 0.0 : (items[i].revenue / max).clamp(0.0, 1.0), minHeight: 6, color: cs.primary, backgroundColor: cs.primary.withValues(alpha: .12)),
             ),
             Text('الكمية ${formatQty(items[i].qty)}', style: TextStyle(fontSize: 11, color: cs.outline)),
           ]),
@@ -658,7 +658,7 @@ class _ExpCatCard extends StatelessWidget {
             const SizedBox(height: 3),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(value: total == 0 ? 0 : e.value / total, minHeight: 6, color: cs.primary, backgroundColor: cs.surfaceContainerHighest),
+              child: LinearProgressIndicator(value: total <= 0 ? 0.0 : (e.value / total).clamp(0.0, 1.0), minHeight: 6, color: cs.primary, backgroundColor: cs.surfaceContainerHighest),
             ),
             const SizedBox(height: 8),
           ],
